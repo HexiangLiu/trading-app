@@ -1,0 +1,27 @@
+@import './base.css';
+
+/* TradingView 图表背景色 */
+/* .layout__area--center *, */
+
+.chart-page,
+.layout__area--top,
+.layout__area--top *,
+.chart-toolbar,
+.chart-toolbar *,
+.layout__area--left,
+.layout__area--left * {
+  background-color: transparent !important;
+  border-color: transparent !important;
+}
+
+.js-rootresizer__contents {
+  background-color: var(--color-b0) !important;
+}
+
+.chart-gui-wrapper div[class^="tooltip-"] div[class^="text-"] {
+  white-space: pre-line;
+}
+
+.chart-markup-table div[class^="legendMainSourceWrapper-"] div[class^="noWrapWrapper-"] {
+  display: none;
+}
