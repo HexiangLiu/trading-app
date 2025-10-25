@@ -1,0 +1,19 @@
+#!/usr/bin/env sh
+. "$(dirname -- "$0")/_/husky.sh"
+
+echo "🔍 Running pre-commit checks..."
+
+echo "📝 Checking TypeScript types..."
+cd apps/web && npx tsc --noEmit || {
+  echo "❌ TypeScript type check failed"
+  exit 1
+}
+cd ../..
+
+echo "🔧 Running lint-staged..."
+npx lint-staged || {
+  echo "❌ Lint-staged failed"
+  exit 1
+}
+
+echo "✅ All pre-commit checks passed!"
