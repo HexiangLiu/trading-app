@@ -15,7 +15,7 @@ import type {
   ResolutionString,
   ResolveCallback,
   SearchSymbolsCallback,
-  SubscribeBarsCallback,
+  SubscribeBarsCallback
 } from '@/charting_library'
 
 export interface Bar {
@@ -28,15 +28,9 @@ export interface Bar {
   symbol?: string // 可选的symbol标识
 }
 
-export interface DatafeedConfig {
-  getCurrentAdapter: () => any // 获取当前adapter的函数
-}
-
 export class Datafeed implements IBasicDataFeed {
-  private getCurrentAdapter: () => any
-
-  constructor(config: DatafeedConfig) {
-    this.getCurrentAdapter = config.getCurrentAdapter
+  constructor() {
+    // 不需要任何配置，单实例
   }
 
   /**
@@ -47,7 +41,7 @@ export class Datafeed implements IBasicDataFeed {
 
     const config: DatafeedConfiguration = {
       exchanges: [
-        { value: 'Binance', name: 'Binance', desc: 'Binance Exchange' },
+        { value: 'Binance', name: 'Binance', desc: 'Binance Exchange' }
       ],
       symbols_types: [{ name: 'Crypto', value: 'crypto' }],
       supported_resolutions: [
@@ -57,11 +51,11 @@ export class Datafeed implements IBasicDataFeed {
         '30',
         '60',
         '240',
-        '1D',
+        '1D'
       ] as ResolutionString[],
       supports_marks: false,
       supports_timescale_marks: false,
-      supports_time: true,
+      supports_time: true
     }
 
     callback(config)
@@ -116,10 +110,10 @@ export class Datafeed implements IBasicDataFeed {
           '5',
           '60',
           '240',
-          '1D',
+          '1D'
         ] as ResolutionString[],
         volume_precision: 8,
-        data_status: 'streaming',
+        data_status: 'streaming'
       }
       onResolve(symbolInfo)
     } catch (error) {
@@ -136,11 +130,9 @@ export class Datafeed implements IBasicDataFeed {
     onError: DatafeedErrorCallback
   ): void {
     try {
-      const adapter = this.getCurrentAdapter()
-      if (!adapter) {
-        onResult([], { noData: true })
-        return
-      }
+      // 从 symbolInfo 中获取 instrument 信息
+      const symbol = symbolInfo.ticker || 'BTCUSDT'
+      const exchange = symbolInfo.exchange || 'Binance'
 
       const startTime = periodParams.from * 1000
       const endTime = periodParams.to * 1000
@@ -149,14 +141,18 @@ export class Datafeed implements IBasicDataFeed {
       const intervalMs = this.getIntervalMs(resolution)
       const limit = Math.min(Math.ceil(timeDiff / intervalMs), 1000)
 
-      adapter
-        .getHistoricalBars(
-          symbolInfo.ticker || 'BTCUSDT',
-          resolution,
-          startTime,
-          endTime,
-          limit
-        )
+      // Import exchangeAdapterManager here to avoid circular dependency
+      import('@/adapters')
+        .then(({ exchangeAdapterManager }) => {
+          const adapter = exchangeAdapterManager.getAdapter(exchange as any)
+          return adapter.getHistoricalBars(
+            symbol,
+            resolution,
+            startTime,
+            endTime,
+            limit
+          )
+        })
         .then((bars: any[]) => {
           console.log(`Received ${bars.length} bars from adapter`)
           onResult(bars, { noData: bars.length === 0 })
@@ -182,24 +178,46 @@ export class Datafeed implements IBasicDataFeed {
       '30': 30 * 60 * 1000, // 30分钟
       '60': 60 * 60 * 1000, // 1小时
       '240': 4 * 60 * 60 * 1000, // 4小时
-      '1D': 24 * 60 * 60 * 1000, // 1天
+      '1D': 24 * 60 * 60 * 1000 // 1天
     }
     return intervalMap[resolution] || 4 * 60 * 60 * 1000 // 默认4小时
   }
 
   subscribeBars(
     _symbolInfo: LibrarySymbolInfo,
-    _resolution: ResolutionString,
+    resolution: ResolutionString,
     onRealtimeCallback: SubscribeBarsCallback,
     subscribeUID: string,
     _onResetCacheNeededCallback: () => void
   ): void {
     console.log('Subscribe bars:', subscribeUID)
 
-    const adapter = this.getCurrentAdapter()
-    if (adapter) {
-      adapter.setBarUpdateCallback(onRealtimeCallback)
+    // 从 symbolInfo 中获取 instrument 信息
+    const symbol = _symbolInfo.ticker || 'BTCUSDT'
+    const exchange = _symbolInfo.exchange || 'Binance'
+
+    // Import exchangeAdapterManager here to avoid circular dependency
+    import('@/adapters').then(({ exchangeAdapterManager }) => {
+      exchangeAdapterManager.subscribe(exchange as any, {
+        symbol: symbol,
+        streamType: 'kline',
+        interval: this.mapResolutionToInterval(resolution),
+        callback: onRealtimeCallback
+      })
+    })
+  }
+
+  private mapResolutionToInterval(resolution: ResolutionString): string {
+    const intervalMap: Record<string, string> = {
+      '1': '1m',
+      '5': '5m',
+      '15': '15m',
+      '30': '30m',
+      '60': '1h',
+      '240': '4h',
+      '1D': '1d'
     }
+    return intervalMap[resolution] || '1m'
   }
 
   unsubscribeBars(_subscribeUID: string): void {}

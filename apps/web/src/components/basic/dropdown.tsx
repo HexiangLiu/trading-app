@@ -2,7 +2,7 @@ import * as DropdownMenuPrimitive from '@radix-ui/react-dropdown-menu'
 
 import type * as React from 'react'
 
-import { cn } from '@/lib/utils'
+import { cn } from '@/utils/classMerge'
 
 function DropdownMenu({
   ...props
@@ -167,5 +167,5 @@ export {
   DropdownMenuSeparator,
   DropdownMenuShortcut,
   DropdownMenuSubContent,
-  DropdownMenuTrigger,
+  DropdownMenuTrigger
 }

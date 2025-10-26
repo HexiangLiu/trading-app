@@ -3,19 +3,33 @@
  * Manages different exchange adapters and handles switching between them
  */
 
-import { Exchange, type Instrument } from '@/types/instrument'
+import { Exchange } from '@/types/instrument'
 import { binanceAdapter } from './Binance'
 
+export interface StreamSubscription {
+  symbol: string
+  streamType: 'kline' | 'depth' | 'trade'
+  interval?: string // for kline streams
+  callback: (data: any) => void
+}
+
 export interface ExchangeAdapter {
-  connect(instrument: Instrument, interval?: string): Promise<void>
+  // Connection management
+  connect(): Promise<void>
   disconnect(): void
-  switchInstrument(symbol: string): Promise<void>
-  switchInterval(symbol: string, interval: string): Promise<void>
-  getCurrentSymbol(): string
-  getCurrentInterval(): string
   getConnectionStatus(): boolean
-  setBarUpdateCallback(callback: (bar: any) => void): void
-  setOrderBookCallback(callback: (orderBook: any) => void): void
+
+  // Dynamic subscription management
+  subscribe(subscription: StreamSubscription): void
+  unsubscribe(
+    symbol: string,
+    streamType: 'kline' | 'depth' | 'trade',
+    interval?: string,
+    callback?: (data: any) => void
+  ): void
+  unsubscribeAll(symbol: string): void
+
+  // Historical data
   getHistoricalBars(
     symbol: string,
     interval: string,
@@ -23,136 +37,129 @@ export interface ExchangeAdapter {
     endTime: number,
     limit?: number
   ): Promise<any[]>
-}
 
+  // Utility methods
+  getActiveStreams(): string[]
+  getExchange(): string
+}
 export class ExchangeAdapterManager {
-  private currentAdapter: ExchangeAdapter | null = null
-  private currentInstrument: Instrument | null = null
+  private adapters = new Map<Exchange, ExchangeAdapter>()
 
   constructor() {
     // Initialize with default adapter
-    this.currentAdapter = binanceAdapter
+    this.adapters.set(Exchange.BINANCE, binanceAdapter)
   }
 
   /**
-   * Connect to an instrument
-   * This will establish the initial connection
+   * Get or create adapter for specific exchange
    */
-  async connect(
-    instrument: Instrument,
-    interval: string = '4h'
-  ): Promise<void> {
-    console.log(
-      'Connecting to instrument:',
-      instrument,
-      'with interval:',
-      interval
-    )
-
-    this.currentInstrument = instrument
-
-    // Get the appropriate adapter for this exchange
-    this.currentAdapter = this.getAdapterForExchange(instrument.exchange)
-
-    // Connect to the instrument
-    if (this.currentAdapter) {
-      await this.currentAdapter.connect(instrument, interval)
+  getAdapter(exchange: Exchange): ExchangeAdapter {
+    let adapter = this.adapters.get(exchange)
+    if (!adapter) {
+      adapter = this.createAdapter(exchange)
+      this.adapters.set(exchange, adapter)
     }
+    return adapter
   }
 
   /**
-   * Switch to a new instrument
-   * This will either switch the WebSocket URL or replace the entire adapter
+   * Create new adapter instance for exchange
    */
-  async switchInstrument(instrument: Instrument): Promise<void> {
-    if (this.currentInstrument === instrument) {
-      return
-    }
-    this.currentInstrument = instrument
-
-    // Disconnect current adapter if connected
-    if (this.currentAdapter) {
-      console.log('disconnect current adapter')
-      this.currentAdapter.disconnect()
-    }
-
-    // Determine if we need to switch adapter or just update the connection
-    const needsNewAdapter =
-      this.currentInstrument?.exchange !== instrument.exchange
-
-    if (needsNewAdapter) {
-      // Switch to a different exchange adapter
-      this.currentAdapter = this.getAdapterForExchange(instrument.exchange)
-      console.log('Switched to new adapter for exchange:', instrument.exchange)
-    }
-
-    // Use the adapter's switchInstrument method
-    if (this.currentAdapter) {
-      await this.currentAdapter.switchInstrument(instrument.name)
-    }
-  }
-
-  /**
-   * Switch time interval for current instrument
-   */
-  async switchInterval(interval: string): Promise<void> {
-    if (!this.currentAdapter || !this.currentInstrument) {
-      console.warn('No adapter or instrument selected')
-      return
-    }
-
-    await this.currentAdapter.switchInterval(
-      this.currentInstrument.name,
-      interval
-    )
-  }
-
-  /**
-   * Get current instrument
-   */
-  getCurrentInstrument(): Instrument | null {
-    return this.currentInstrument
-  }
-
-  /**
-   * Get current adapter
-   */
-  getCurrentAdapter(): ExchangeAdapter | null {
-    return this.currentAdapter
-  }
-
-  /**
-   * Get connection status
-   */
-  getConnectionStatus(): boolean {
-    return this.currentAdapter?.getConnectionStatus() ?? false
-  }
-
-  /**
-   * Disconnect current adapter
-   */
-  disconnect(): void {
-    if (this.currentAdapter) {
-      this.currentAdapter.disconnect()
-    }
-  }
-
-  /**
-   * Get adapter for specific exchange
-   */
-  private getAdapterForExchange(exchange: Exchange): ExchangeAdapter {
+  private createAdapter(exchange: Exchange): ExchangeAdapter {
     switch (exchange) {
       case Exchange.BINANCE:
         return binanceAdapter
       // Add more exchanges here in the future
       // case Exchange.BYBIT:
-      //   return bybitAdapter;
+      //   return new BybitAdapter()
       // case Exchange.OKX:
-      //   return okxAdapter;
+      //   return new OkxAdapter()
       default:
         console.warn(`Unknown exchange: ${exchange}, falling back to Binance`)
         return binanceAdapter
     }
+  }
+
+  /**
+   * Subscribe to a stream for specific exchange
+   */
+  subscribe(exchange: Exchange, subscription: StreamSubscription): void {
+    const adapter = this.getAdapter(exchange)
+    adapter.subscribe(subscription)
+  }
+
+  /**
+   * Unsubscribe from a stream for specific exchange
+   */
+  unsubscribe(
+    exchange: Exchange,
+    symbol: string,
+    streamType: 'kline' | 'depth' | 'trade',
+    interval?: string,
+    callback?: (data: any) => void
+  ): void {
+    const adapter = this.adapters.get(exchange)
+    if (adapter) {
+      adapter.unsubscribe(symbol, streamType, interval, callback)
+
+      // Auto-disconnect if no active streams
+      if (adapter.getActiveStreams().length === 0) {
+        adapter.disconnect()
+        this.adapters.delete(exchange)
+      }
+    }
+  }
+
+  /**
+   * Unsubscribe from all streams for a symbol
+   */
+  unsubscribeAll(exchange: Exchange, symbol: string): void {
+    const adapter = this.adapters.get(exchange)
+    if (adapter) {
+      adapter.unsubscribeAll(symbol)
+
+      // Auto-disconnect if no active streams
+      if (adapter.getActiveStreams().length === 0) {
+        adapter.disconnect()
+        this.adapters.delete(exchange)
+      }
+    }
+  }
+
+  /**
+   * Get connection status for specific exchange
+   */
+  getConnectionStatus(exchange: Exchange): boolean {
+    const adapter = this.adapters.get(exchange)
+    return adapter?.getConnectionStatus() ?? false
+  }
+
+  /**
+   * Disconnect specific exchange
+   */
+  disconnect(exchange: Exchange): void {
+    const adapter = this.adapters.get(exchange)
+    if (adapter) {
+      adapter.disconnect()
+      this.adapters.delete(exchange)
+    }
+  }
+
+  /**
+   * Disconnect all exchanges
+   */
+  disconnectAll(): void {
+    for (const [, adapter] of this.adapters) {
+      adapter.disconnect()
+    }
+    this.adapters.clear()
+  }
+
+  /**
+   * Get all active adapters
+   */
+  getActiveAdapters(): Map<Exchange, ExchangeAdapter> {
+    return new Map(this.adapters)
   }
 }
 

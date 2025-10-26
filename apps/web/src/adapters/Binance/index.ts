@@ -3,9 +3,7 @@
  * Based on https://developers.binance.com/docs/binance-spot-api-docs/web-socket-streams#klinecandlestick-streams-with-timezone-offset
  */
 
-import type { Instrument, InstrumentName } from '@/types/instrument'
-import { Exchange } from '@/types/instrument'
-import type { ExchangeAdapter } from '..'
+import type { ExchangeAdapter, StreamSubscription } from '..'
 
 export interface KlineData {
   openTime: number
@@ -75,7 +73,7 @@ export class BinanceAdapter implements ExchangeAdapter {
     '30': '30m',
     '60': '1h',
     '240': '4h',
-    '1D': '1d',
+    '1D': '1d'
   } as const
 
   private ws: WebSocket | null = null
@@ -83,12 +81,11 @@ export class BinanceAdapter implements ExchangeAdapter {
   private reconnectAttempts = 0
   private maxReconnectAttempts = 5
   private reconnectDelay = 1000
-  private klineStreams: string[] = []
-  private currentSymbol = 'BTCUSDT'
-  private currentInterval = '4h'
-  private barUpdateCallback: ((bar: any) => void) | null = null
-  private orderBookCallback: ((orderBook: OrderBookData) => void) | null = null
-  private orderBookStreams: string[] = []
+
+  // Active streams management
+  private activeStreams = new Set<string>()
+  private subscriptions = new Map<string, StreamSubscription[]>() // 支持多个订阅者
+  private connectingPromise: Promise<void> | null = null // 防止重复连接
 
   private baseApiUrl: string
   private baseStreamUrl: string
@@ -100,42 +97,176 @@ export class BinanceAdapter implements ExchangeAdapter {
     this.baseApiUrl = baseApiUrl
     this.baseStreamUrl = baseStreamUrl
   }
-  setBarUpdateCallback(callback: (bar: any) => void): void {
-    this.barUpdateCallback = callback
+  // New interface methods
+  subscribe(subscription: StreamSubscription): void {
+    const streamName = this.getStreamName(
+      subscription.symbol,
+      subscription.streamType,
+      subscription.interval
+    )
+    const subscriptionKey = this.getSubscriptionKey(
+      subscription.symbol,
+      subscription.streamType,
+      subscription.interval
+    )
+
+    // Get existing subscriptions for this stream
+    const streamSubscriptions = this.subscriptions.get(subscriptionKey) || []
+
+    // Check if this exact subscription already exists (same callback)
+    const existingSubscription = streamSubscriptions.find(
+      sub => sub.callback === subscription.callback
+    )
+    if (existingSubscription) {
+      console.log(`Callback already subscribed to stream: ${streamName}`)
+      return
+    }
+
+    // Add new subscription to the list
+    streamSubscriptions.push(subscription)
+    this.subscriptions.set(subscriptionKey, streamSubscriptions)
+
+    // Add to active streams (only if this is the first subscription for this stream)
+    const isNewStream = !this.activeStreams.has(streamName)
+    this.activeStreams.add(streamName)
+
+    console.log(
+      `Subscribed to stream: ${streamName}, isNewStream: ${isNewStream}`
+    )
+
+    // If not connected, connect first (connect will handle all active streams)
+    if (!this.isConnected) {
+      // Prevent multiple simultaneous connection attempts
+      if (!this.connectingPromise) {
+        this.connectingPromise = this.connect()
+          .then(() => {
+            // Connection established, no need to call subscribeToStream
+            // because connect() already handles all active streams via URL
+            console.log(
+              `Connection established, stream ${streamName} will be handled automatically`
+            )
+            this.connectingPromise = null
+          })
+          .catch(error => {
+            console.error('Failed to connect for subscription:', error)
+            this.connectingPromise = null
+          })
+      }
+
+      // Wait for connection to complete
+      this.connectingPromise.then(() => {
+        // Connection completed, stream will be handled automatically
+      })
+    } else if (isNewStream) {
+      // If already connected and this is a new stream, subscribe to it
+      this.subscribeToStream(streamName)
+    }
   }
 
-  setOrderBookCallback(callback: (orderBook: OrderBookData) => void): void {
-    this.orderBookCallback = callback
+  unsubscribe(
+    symbol: string,
+    streamType: 'kline' | 'depth' | 'trade',
+    interval?: string,
+    callback?: (data: any) => void
+  ): void {
+    const streamName = this.getStreamName(symbol, streamType, interval)
+    const subscriptionKey = this.getSubscriptionKey(
+      symbol,
+      streamType,
+      interval
+    )
+
+    // Get existing subscriptions for this stream
+    const streamSubscriptions = this.subscriptions.get(subscriptionKey) || []
+
+    if (callback) {
+      // Remove specific callback subscription
+      const filteredSubscriptions = streamSubscriptions.filter(
+        sub => sub.callback !== callback
+      )
+      this.subscriptions.set(subscriptionKey, filteredSubscriptions)
+
+      // If no more subscriptions for this stream, remove it
+      if (filteredSubscriptions.length === 0) {
+        this.subscriptions.delete(subscriptionKey)
+        this.activeStreams.delete(streamName)
+
+        // If connected, unsubscribe from stream
+        if (this.isConnected && this.ws) {
+          this.unsubscribeFromStream(streamName)
+        }
+      }
+    } else {
+      // Remove all subscriptions for this stream
+      this.subscriptions.delete(subscriptionKey)
+      this.activeStreams.delete(streamName)
+
+      // If connected, unsubscribe from stream
+      if (this.isConnected && this.ws) {
+        this.unsubscribeFromStream(streamName)
+      }
+    }
+  }
+
+  unsubscribeAll(symbol: string): void {
+    // Find all subscriptions for this symbol
+    const subscriptionsToRemove: string[] = []
+
+    for (const [key, subscriptions] of this.subscriptions) {
+      // Check if any subscription in this stream matches the symbol
+      if (subscriptions.some(sub => sub.symbol === symbol)) {
+        subscriptionsToRemove.push(key)
+      }
+    }
+
+    // Unsubscribe from all found subscriptions
+    for (const key of subscriptionsToRemove) {
+      const subscriptions = this.subscriptions.get(key)
+      if (subscriptions && subscriptions.length > 0) {
+        // Get the first subscription to extract stream info
+        const firstSub = subscriptions[0]
+        this.unsubscribe(
+          firstSub.symbol,
+          firstSub.streamType,
+          firstSub.interval
+        )
+      }
+    }
+  }
+
+  getActiveStreams(): string[] {
+    return Array.from(this.activeStreams)
+  }
+
+  getExchange(): string {
+    return 'BINANCE'
   }
 
   /**
    * Connect to WebSocket Streams
    */
-  async connect(
-    instrument: Instrument,
-    interval: string = '4h'
-  ): Promise<void> {
+  async connect(): Promise<void> {
     return new Promise((resolve, reject) => {
       try {
-        if (this.ws) {
+        if (this.ws && this.isConnected) {
           console.log('already connected')
           resolve()
           return
         }
 
-        // Build stream names
-        const klineStreamName = `${instrument.name.toLowerCase()}@kline_${interval}`
-        const orderBookStreamName = `${instrument.name.toLowerCase()}@depth20@100ms`
-        const allStreams = [klineStreamName, orderBookStreamName]
+        // Build stream names from active subscriptions
+        const allStreams = Array.from(this.activeStreams)
+        if (allStreams.length === 0) {
+          console.log('No active streams to connect to')
+          resolve()
+          return
+        }
+
         const streamsParam = allStreams.join('/')
         const url = `${this.baseStreamUrl}/stream?streams=${streamsParam}`
 
         console.log('Connecting to:', url)
         this.ws = new WebSocket(url)
-        this.klineStreams = [klineStreamName]
-        this.orderBookStreams = [orderBookStreamName]
-        this.currentSymbol = instrument.name
-        this.currentInterval = interval
 
         this.ws.onopen = () => {
           console.log('Binance WebSocket Streams connected')
@@ -177,8 +308,102 @@ export class BinanceAdapter implements ExchangeAdapter {
       this.ws = null
     }
     this.isConnected = false
-    this.klineStreams = []
-    this.orderBookStreams = []
+    this.activeStreams.clear()
+    this.subscriptions.clear()
+  }
+
+  /**
+   * Get stream name for subscription
+   */
+  private getStreamName(
+    symbol: string,
+    streamType: 'kline' | 'depth' | 'trade',
+    interval?: string
+  ): string {
+    const symbolLower = symbol.toLowerCase()
+
+    switch (streamType) {
+      case 'kline': {
+        // Map TradingView interval to Binance interval
+        const binanceInterval = interval
+          ? BinanceAdapter.INTERVAL_MAP[
+              interval as keyof typeof BinanceAdapter.INTERVAL_MAP
+            ] || interval
+          : '1m'
+        return `${symbolLower}@kline_${binanceInterval}`
+      }
+      case 'depth':
+        return `${symbolLower}@depth20@100ms`
+      case 'trade':
+        return `${symbolLower}@trade`
+      default:
+        throw new Error(`Unsupported stream type: ${streamType}`)
+    }
+  }
+
+  /**
+   * Get subscription key for tracking
+   */
+  private getSubscriptionKey(
+    symbol: string,
+    streamType: 'kline' | 'depth' | 'trade',
+    interval?: string
+  ): string {
+    // For kline streams, use the original interval for key consistency
+    // The mapping to Binance format only happens in getStreamName
+    return `${symbol}_${streamType}_${interval || ''}`
+  }
+
+  /**
+   * Subscribe to a specific stream
+   */
+  private subscribeToStream(streamName: string): void {
+    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
+      console.warn(
+        'WebSocket not connected, cannot subscribe to stream:',
+        streamName
+      )
+      return
+    }
+
+    // Double check: ensure we're not already subscribed to this stream
+    if (!this.activeStreams.has(streamName)) {
+      console.warn(
+        `Stream ${streamName} not in activeStreams, skipping subscription`
+      )
+      return
+    }
+
+    const subscribeMessage = {
+      method: 'SUBSCRIBE',
+      params: [streamName],
+      id: Date.now()
+    }
+
+    this.ws.send(JSON.stringify(subscribeMessage))
+    console.log('Subscribed to stream:', streamName)
+  }
+
+  /**
+   * Unsubscribe from a specific stream
+   */
+  private unsubscribeFromStream(streamName: string): void {
+    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
+      console.warn(
+        'WebSocket not connected, cannot unsubscribe from stream:',
+        streamName
+      )
+      return
+    }
+
+    const unsubscribeMessage = {
+      method: 'UNSUBSCRIBE',
+      params: [streamName],
+      id: Date.now()
+    }
+
+    this.ws.send(JSON.stringify(unsubscribeMessage))
+    console.log('Unsubscribed from stream:', streamName)
   }
 
   /**
@@ -189,21 +414,54 @@ export class BinanceAdapter implements ExchangeAdapter {
     if (data.stream && data.data) {
       const streamName = data.stream
 
-      // Handle K-line data stream
-      if (streamName.includes('@kline_')) {
-        this.handleKlineStream(data)
+      // Find matching subscriptions
+      const subscriptions = this.findSubscriptionsByStreamName(streamName)
+      if (subscriptions.length === 0) {
+        console.warn('No subscriptions found for stream:', streamName)
+        return
       }
-      // Handle Order Book data stream
-      else if (streamName.includes('@depth')) {
-        this.handleOrderBookStream(data)
+
+      // Handle different stream types and distribute to all subscribers
+      if (streamName.includes('@kline_')) {
+        this.handleKlineStream(data, subscriptions)
+      } else if (streamName.includes('@depth')) {
+        this.handleOrderBookStream(data, subscriptions)
+      } else if (streamName.includes('@trade')) {
+        this.handleTradeStream(data, subscriptions)
       }
     }
   }
 
   /**
+   * Find all subscriptions by stream name
+   */
+  private findSubscriptionsByStreamName(
+    streamName: string
+  ): StreamSubscription[] {
+    const result: StreamSubscription[] = []
+
+    for (const subscriptions of this.subscriptions.values()) {
+      for (const subscription of subscriptions) {
+        const expectedStreamName = this.getStreamName(
+          subscription.symbol,
+          subscription.streamType,
+          subscription.interval
+        )
+        if (expectedStreamName === streamName) {
+          result.push(subscription)
+        }
+      }
+    }
+    return result
+  }
+
+  /**
    * Handle K-line data stream
    */
-  private handleKlineStream(data: any): void {
+  private handleKlineStream(
+    data: any,
+    subscriptions: StreamSubscription[]
+  ): void {
     const streamName = data.stream
     const klineData = data.data
 
@@ -219,34 +477,81 @@ export class BinanceAdapter implements ExchangeAdapter {
         low: kline.low,
         close: kline.close,
         volume: kline.volume,
-        symbol: this.currentSymbol,
+        symbol: subscriptions[0].symbol // Use first subscription's symbol
       }
-      this.barUpdateCallback?.(bar)
+
+      // Call all subscription callbacks
+      subscriptions.forEach(subscription => {
+        subscription.callback(bar)
+      })
     }
   }
 
   /**
    * Handle Order Book data stream
    */
-  private handleOrderBookStream(data: any): void {
+  private handleOrderBookStream(
+    data: any,
+    subscriptions: StreamSubscription[]
+  ): void {
     const orderBookData = data.data
 
-    if (orderBookData && this.orderBookCallback) {
+    if (orderBookData) {
       const orderBook: OrderBookData = {
         lastUpdateId: orderBookData.lastUpdateId,
         bids: orderBookData.bids.map(([price, quantity]: [string, string]) => ({
           price,
-          quantity,
+          quantity
         })),
         asks: orderBookData.asks.map(([price, quantity]: [string, string]) => ({
           price,
-          quantity,
+          quantity
         })),
-        symbol: this.currentSymbol,
-        timestamp: Date.now(),
+        symbol: subscriptions[0].symbol, // Use first subscription's symbol
+        timestamp: Date.now()
       }
 
-      this.orderBookCallback(orderBook)
+      // Call all subscription callbacks
+      subscriptions.forEach(subscription => {
+        try {
+          subscription.callback(orderBook)
+        } catch (error) {
+          console.error(
+            'BinanceAdapter: Error calling order book callback:',
+            error
+          )
+        }
+      })
+    }
+  }
+
+  /**
+   * Handle Trade data stream
+   */
+  private handleTradeStream(
+    data: any,
+    subscriptions: StreamSubscription[]
+  ): void {
+    const tradeData = data.data
+
+    if (tradeData) {
+      // Convert to standard trade format
+      const trade = {
+        symbol: subscriptions[0].symbol, // Use first subscription's symbol
+        price: parseFloat(tradeData.p),
+        quantity: parseFloat(tradeData.q),
+        timestamp: tradeData.T,
+        isBuyerMaker: tradeData.m
+      }
+
+      // Call all subscription callbacks
+      subscriptions.forEach(subscription => {
+        try {
+          subscription.callback(trade)
+        } catch (error) {
+          console.error('BinanceAdapter: Error calling trade callback:', error)
+        }
+      })
     }
   }
 
@@ -268,7 +573,7 @@ export class BinanceAdapter implements ExchangeAdapter {
       trades: k.n,
       buyBaseVolume: parseFloat(k.V),
       buyQuoteVolume: parseFloat(k.Q),
-      isClosed: k.x,
+      isClosed: k.x
     }
   }
 
@@ -289,17 +594,12 @@ export class BinanceAdapter implements ExchangeAdapter {
     )
 
     setTimeout(() => {
-      // Use current symbol and interval for reconnection
-      const instrument = {
-        name: this.currentSymbol as InstrumentName,
-        exchange: Exchange.BINANCE,
-      }
-      this.connect(instrument, this.currentInterval)
+      // Reconnect with current active streams
+      this.connect()
         .then(() => {
           console.log(
             'Reconnected successfully with streams:',
-            this.klineStreams,
-            this.orderBookStreams
+            Array.from(this.activeStreams)
           )
         })
         .catch(error => {
@@ -314,117 +614,6 @@ export class BinanceAdapter implements ExchangeAdapter {
    */
   getConnectionStatus(): boolean {
     return this.isConnected && this.ws?.readyState === WebSocket.OPEN
-  }
-
-  /**
-   * Get currently connected streams
-   */
-  getStreams(): string[] {
-    return [...this.klineStreams]
-  }
-
-  /**
-   * Switch trading instrument
-   */
-  async switchInstrument(symbol: string): Promise<void> {
-    console.log(`Switching instrument to ${symbol}`)
-
-    this.currentSymbol = symbol
-
-    // Disconnect current connection
-    this.disconnect()
-
-    // Reconnect with new stream (using current interval)
-    const instrument = {
-      name: symbol as InstrumentName,
-      exchange: Exchange.BINANCE,
-    }
-    await this.connect(instrument, this.currentInterval)
-  }
-
-  /**
-   * Switch time interval
-   * Only update K-line stream, keep Order Book stream unchanged
-   */
-  async switchInterval(symbol: string, interval: string): Promise<void> {
-    const mappedInterval =
-      BinanceAdapter.INTERVAL_MAP[
-        interval as keyof typeof BinanceAdapter.INTERVAL_MAP
-      ]
-    console.log(`Switching to ${symbol} ${mappedInterval}`)
-
-    this.currentSymbol = symbol
-
-    // If WebSocket is connected, use subscribe/unsubscribe mechanism
-    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-      await this.updateKlineStream(symbol, mappedInterval)
-    } else {
-      // If not connected, reconnect all streams
-      const instrument = {
-        name: symbol as InstrumentName,
-        exchange: Exchange.BINANCE,
-      }
-      await this.connect(instrument, mappedInterval)
-    }
-  }
-
-  /**
-   * Update K-line stream, keep Order Book stream unchanged
-   */
-  private async updateKlineStream(
-    symbol: string,
-    interval: string
-  ): Promise<void> {
-    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
-      console.warn('WebSocket not connected, cannot update Kline stream')
-      return
-    }
-
-    try {
-      // Unsubscribe from old K-line stream
-      const oldKlineStream = `${this.currentSymbol.toLowerCase()}@kline_${this.currentInterval}`
-      const unsubscribeMessage = {
-        method: 'UNSUBSCRIBE',
-        params: [oldKlineStream],
-        id: Date.now(),
-      }
-      this.ws.send(JSON.stringify(unsubscribeMessage))
-      console.log('Unsubscribed from old Kline stream:', oldKlineStream)
-
-      // Subscribe to new K-line stream
-      const newKlineStream = `${symbol.toLowerCase()}@kline_${interval}`
-      const subscribeMessage = {
-        method: 'SUBSCRIBE',
-        params: [newKlineStream],
-        id: Date.now() + 1,
-      }
-      this.ws.send(JSON.stringify(subscribeMessage))
-      console.log('Subscribed to new Kline stream:', newKlineStream)
-
-      // Update klineStreams array and current interval
-      this.klineStreams = [newKlineStream]
-      this.currentInterval = interval
-    } catch (error) {
-      console.error('Error updating Kline stream:', error)
-      // If update fails, fallback to reconnection
-      this.disconnect()
-      const instrument = {
-        name: symbol as InstrumentName,
-        exchange: Exchange.BINANCE,
-      }
-      await this.connect(instrument, interval)
-    }
-  }
-
-  /**
-   * Get current symbol and interval
-   */
-  getCurrentSymbol(): string {
-    return this.currentSymbol
-  }
-
-  getCurrentInterval(): string {
-    return this.currentInterval
   }
 
   /**
@@ -452,7 +641,7 @@ export class BinanceAdapter implements ExchangeAdapter {
         interval: binanceInterval,
         startTime: startTime.toString(),
         endTime: endTime.toString(),
-        limit: Math.min(limit, 1000).toString(), // Binance supports up to 1000 bars
+        limit: Math.min(limit, 1000).toString() // Binance supports up to 1000 bars
       })
 
       const url = `${this.baseApiUrl}${endpoint}?${params}`
@@ -473,7 +662,7 @@ export class BinanceAdapter implements ExchangeAdapter {
         low: parseFloat(kline[3]), // Low price
         close: parseFloat(kline[4]), // Close price
         volume: parseFloat(kline[5]), // Volume
-        symbol: symbol,
+        symbol: symbol
       }))
     } catch (error) {
       console.error('Failed to fetch historical data:', error)

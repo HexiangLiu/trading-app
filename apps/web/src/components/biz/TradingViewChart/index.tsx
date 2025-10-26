@@ -1,25 +1,43 @@
+/* eslint-disable react-hooks/exhaustive-deps */
 import { useAtom } from 'jotai'
 import { memo, useCallback, useEffect, useRef } from 'react'
 import { exchangeAdapterManager } from '@/adapters'
 import {
   type IChartingLibraryWidget,
   type ResolutionString,
-  widget,
+  widget
 } from '@/charting_library'
 import { DEFAULT_INSTRUMENT, instrumentAtom } from '@/store/instrument'
 import type { Instrument } from '@/types/instrument'
 import { Datafeed } from './datafeed'
 
+// 单实例 datafeed，避免重复创建
+const datafeed = new Datafeed()
+
 export const TradingViewChart = memo(() => {
   const chartContainerRef = useRef<HTMLDivElement>(null)
   const widgetRef = useRef<IChartingLibraryWidget>(null)
   const prevInstrumentRef = useRef<Instrument>(DEFAULT_INSTRUMENT)
+  const currentIntervalRef = useRef<string>('4h') // 跟踪当前使用的 interval
   const [instrument] = useAtom(instrumentAtom)
 
   const handleSwitchInstrument = useCallback(async (instrument: Instrument) => {
     if (prevInstrumentRef.current === instrument) return
+
+    const oldInstrument = prevInstrumentRef.current
     prevInstrumentRef.current = instrument
-    await exchangeAdapterManager.switchInstrument(instrument)
+
+    // Unsubscribe from old instrument kline streams only
+    if (oldInstrument) {
+      // Only unsubscribe kline streams, other components might still need depth/trade streams
+      exchangeAdapterManager.unsubscribe(
+        oldInstrument.exchange,
+        oldInstrument.name,
+        'kline',
+        currentIntervalRef.current
+      )
+    }
+
     widgetRef.current
       ?.chart()
       .setSymbol(`${instrument.exchange}:${instrument.name.toUpperCase()}`)
@@ -29,11 +47,9 @@ export const TradingViewChart = memo(() => {
     handleSwitchInstrument(instrument)
   }, [instrument, handleSwitchInstrument])
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (!chartContainerRef.current) return
-    const datafeed = new Datafeed({
-      getCurrentAdapter: () => exchangeAdapterManager.getCurrentAdapter(),
-    })
 
     try {
       const tvWidget = new widget({
@@ -51,8 +67,8 @@ export const TradingViewChart = memo(() => {
           'header_symbol_search',
           'header_compare',
           'header_chart_type',
-          'timeframes_toolbar',
-        ],
+          'timeframes_toolbar'
+        ]
       })
       widgetRef.current = tvWidget
 
@@ -62,13 +78,23 @@ export const TradingViewChart = memo(() => {
         tvWidget
           .chart()
           .onIntervalChanged()
-          .subscribe(null, interval =>
-            exchangeAdapterManager.switchInterval(interval)
-          )
+          .subscribe(null, interval => {
+            // Unsubscribe from current kline stream
+            exchangeAdapterManager.unsubscribe(
+              instrument.exchange,
+              instrument.name,
+              'kline',
+              currentIntervalRef.current
+            )
+
+            // Update current interval
+            currentIntervalRef.current = interval
+            // Note: New subscription will be handled by datafeed.subscribeBars
+          })
 
         const chart = tvWidget.chart()
         chart.createStudy('Moving Average Exponential', false, false, {
-          length: 9,
+          length: 9
         })
       })
 
@@ -79,7 +105,7 @@ export const TradingViewChart = memo(() => {
       console.error('Failed to initialize TradingView chart:', error)
       return undefined
     }
-  }, [])
+  }, []) // 只在组件挂载时初始化一次，instrument 通过 ref 获取最新值
 
   return <div ref={chartContainerRef} className="w-full h-full" />
 })

@@ -3,17 +3,17 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuTrigger,
+  DropdownMenuTrigger
 } from '@/components/basic/dropdown'
-import { cn } from '@/lib/utils'
 import { instrumentAtom } from '@/store/instrument'
 import { darkModeAtom } from '@/store/theme'
 import { Exchange, type Instrument, InstrumentName } from '@/types/instrument'
+import { cn } from '@/utils/classMerge'
 
 const INSTRUMENTS: Instrument[] = [
   { name: InstrumentName.BTCUSDT, exchange: Exchange.BINANCE },
   { name: InstrumentName.ETHUSDT, exchange: Exchange.BINANCE },
-  { name: InstrumentName.SOLUSDT, exchange: Exchange.BINANCE },
+  { name: InstrumentName.SOLUSDT, exchange: Exchange.BINANCE }
 ]
 
 export const InstrumentSelector = () => {

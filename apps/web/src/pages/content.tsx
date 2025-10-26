@@ -1,15 +1,13 @@
 import { useAtom } from 'jotai'
-import { memo, useCallback, useEffect } from 'react'
+import { memo, useCallback, useMemo } from 'react'
 import { type Layout, Responsive, WidthProvider } from 'react-grid-layout'
-import { exchangeAdapterManager } from '@/adapters'
 import { InstrumentSelector } from '@/components/biz/InstrumentSelector'
 import { OrderBook } from '@/components/biz/OrderBook'
 import { PositionsWidget } from '@/components/biz/PositionsWidget'
 import { TradeTicket } from '@/components/biz/TradeTicket'
 import { TradingViewChart } from '@/components/biz/TradingViewChart'
-import { useThrottle } from '@/hooks/useThrottle'
-import { DEFAULT_INSTRUMENT } from '@/store/instrument'
 import { layoutAtom } from '@/store/layout'
+import { throttle } from '@/utils/throttle'
 import 'react-grid-layout/css/styles.css'
 
 const ResponsiveGridLayout = WidthProvider(Responsive)
@@ -20,14 +18,6 @@ const DragHandle = () => (
 
 export const Content = memo(() => {
   const [layouts, setLayouts] = useAtom(layoutAtom)
-
-  useEffect(() => {
-    exchangeAdapterManager.connect(DEFAULT_INSTRUMENT)
-
-    return () => {
-      exchangeAdapterManager.disconnect()
-    }
-  }, [])
 
   const handleLayoutChange = useCallback(
     (layout: Layout[]) => {
@@ -41,7 +31,10 @@ export const Content = memo(() => {
     document.dispatchEvent(event)
   }, [])
 
-  const throttledDispatchResize = useThrottle(dispatchResizeEvent, 100)
+  const throttledDispatchResize = useMemo(
+    () => throttle(dispatchResizeEvent, 100),
+    [dispatchResizeEvent]
+  )
 
   const handleResize = useCallback(
     (

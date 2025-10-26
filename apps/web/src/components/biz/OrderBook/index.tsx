@@ -1,13 +1,13 @@
-import { useAtomValue } from "jotai"
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react"
-import { exchangeAdapterManager } from "@/adapters"
-import { useThrottle } from "@/hooks/useThrottle"
-import { useVisibleRows } from "@/hooks/useVisibleRows"
-import { instrumentAtom } from "@/store/instrument"
-import { InstrumentName } from "@/types/instrument"
-import type { OrderBookData, ProcessedOrderBook } from "@/types/orderbook"
-import { OrderBookRow } from "./Row"
-import { processOrderBookData } from "./utils/processData"
+import { useAtomValue } from 'jotai'
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { exchangeAdapterManager } from '@/adapters'
+import { useVisibleRows } from '@/hooks/useVisibleRows'
+import { instrumentAtom } from '@/store/instrument'
+import { InstrumentName } from '@/types/instrument'
+import type { OrderBookData, ProcessedOrderBook } from '@/types/orderbook'
+import { throttle } from '@/utils/throttle'
+import { OrderBookRow } from './Row'
+import { processOrderBookData } from './utils/processData'
 
 const TICK_SIZE_MAP = {
   [InstrumentName.BTCUSDT]: 0.01,
@@ -61,16 +61,34 @@ export const OrderBook = memo(() => {
     []
   )
 
-  const throttledUpdate = useThrottle((data: OrderBookData) => {
-    processAndUpdateData(data, tickSize)
-  }, 200)
+  // Create throttled callback using utils function
+  const throttledUpdate = useMemo(
+    () =>
+      throttle((data: OrderBookData) => {
+        processAndUpdateData(data, tickSize)
+      }, 200),
+    [processAndUpdateData, tickSize]
+  )
 
   useEffect(() => {
-    const adapter = exchangeAdapterManager.getCurrentAdapter()
-    if (adapter) {
-      adapter.setOrderBookCallback(throttledUpdate)
+    // Subscribe to depth stream for current instrument
+    exchangeAdapterManager.subscribe(instrument.exchange, {
+      symbol: instrument.name,
+      streamType: 'depth',
+      callback: throttledUpdate
+    })
+
+    // Cleanup: unsubscribe when component unmounts or instrument changes
+    return () => {
+      exchangeAdapterManager.unsubscribe(
+        instrument.exchange,
+        instrument.name,
+        'depth',
+        undefined, // interval
+        throttledUpdate
+      )
     }
-  }, [throttledUpdate])
+  }, [instrument, throttledUpdate])
 
   // Handle scrolling when visible rows change
   useEffect(() => {
@@ -81,14 +99,14 @@ export const OrderBook = memo(() => {
       if (askContainerRef.current) {
         askContainerRef.current.scrollTo({
           top: askContainerRef.current.scrollHeight,
-          behavior: "smooth"
+          behavior: 'smooth'
         })
       }
       // For bid container, scroll to top to show latest data
       if (bidContainerRef.current) {
         bidContainerRef.current.scrollTo({
           top: 0,
-          behavior: "smooth"
+          behavior: 'smooth'
         })
       }
     }, 0)
@@ -178,4 +196,4 @@ export const OrderBook = memo(() => {
   )
 })
 
-OrderBook.displayName = "OrderBook"
+OrderBook.displayName = 'OrderBook'
