@@ -15,6 +15,7 @@ export interface ExchangeAdapter {
   getCurrentInterval(): string
   getConnectionStatus(): boolean
   setBarUpdateCallback(callback: (bar: any) => void): void
+  setOrderBookCallback(callback: (orderBook: any) => void): void
   getHistoricalBars(
     symbol: string,
     interval: string,

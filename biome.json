@@ -15,7 +15,7 @@
       "jsxQuoteStyle": "double",
       "quoteStyle": "single",
       "semicolons": "asNeeded",
-      "trailingCommas": "es5"
+      "trailingCommas": "none"
     }
   },
   "json": {

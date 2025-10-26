@@ -30,13 +30,6 @@ export const TradingViewChart = memo(() => {
   }, [instrument, handleSwitchInstrument])
 
   useEffect(() => {
-    exchangeAdapterManager.connect(DEFAULT_INSTRUMENT)
-    return () => {
-      exchangeAdapterManager.disconnect()
-    }
-  }, [])
-
-  useEffect(() => {
     if (!chartContainerRef.current) return
     const datafeed = new Datafeed({
       getCurrentAdapter: () => exchangeAdapterManager.getCurrentAdapter(),

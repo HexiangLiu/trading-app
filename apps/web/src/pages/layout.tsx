@@ -1,27 +1,10 @@
 import { useAtom } from 'jotai'
-import { type Layout, Responsive, WidthProvider } from 'react-grid-layout'
-import 'react-grid-layout/css/styles.css'
-import { InstrumentSelector } from '../components/biz/InstrumentSelector'
-import { OrderBook } from '../components/biz/OrderBook'
-import { PositionsWidget } from '../components/biz/PositionsWidget'
-import { TradeTicket } from '../components/biz/TradeTicket'
-import { TradingViewChart } from '../components/biz/TradingViewChart'
-import { layoutAtom } from '../store/layout'
+
 import { darkModeAtom } from '../store/theme'
-
-const ResponsiveGridLayout = WidthProvider(Responsive)
-
-const DragHandle = () => (
-  <span className="drag-handle absolute opacity-10 h-2 top-0 inset-x-0 mx-auto block z-10 cursor-grab active:cursor-grabbing" />
-)
+import { Content } from './content'
 
 const TradingLayout: React.FC = () => {
   const [isDarkMode, setIsDarkMode] = useAtom(darkModeAtom)
-  const [layouts, setLayouts] = useAtom(layoutAtom)
-
-  const handleLayoutChange = (layout: Layout[]) => {
-    setLayouts({ lg: layout })
-  }
 
   return (
     <div
@@ -51,70 +34,7 @@ const TradingLayout: React.FC = () => {
         </div>
 
         <div>
-          <ResponsiveGridLayout
-            className="layout"
-            layouts={layouts}
-            breakpoints={{ lg: 1200 }}
-            cols={{ lg: 12 }}
-            rowHeight={70}
-            isDraggable={true}
-            isResizable={true}
-            margin={[4, 4]}
-            containerPadding={[0, 0]}
-            useCSSTransforms={true}
-            transformScale={1}
-            preventCollision={false}
-            compactType="vertical"
-            allowOverlap={false}
-            onLayoutChange={handleLayoutChange}
-            draggableHandle=".drag-handle"
-          >
-            <div
-              key="instrument"
-              className="relative flex items-center bg-gray-100 dark:bg-neutral-900 rounded-lg shadow-md p-4 border border-gray-200 dark:border-gray-700"
-            >
-              <DragHandle />
-              <InstrumentSelector />
-            </div>
-
-            <div
-              key="chart"
-              className="relative bg-gray-100 dark:bg-neutral-900 rounded-lg shadow-md border border-gray-700 dark:border-gray-700"
-            >
-              <DragHandle />
-              <TradingViewChart />
-            </div>
-
-            <div
-              key="orderbook"
-              className="relative bg-gray-100 dark:bg-neutral-900 rounded-lg shadow-md border border-gray-700 dark:border-gray-700"
-            >
-              <DragHandle />
-              <div className="p-4 h-full">
-                <OrderBook />
-              </div>
-            </div>
-
-            <div
-              key="ticket"
-              className="relative bg-gray-100 dark:bg-neutral-900 rounded-lg shadow-md border border-gray-700 dark:border-gray-700"
-            >
-              <DragHandle />
-              <div className="p-4 h-full">
-                <TradeTicket />
-              </div>
-            </div>
-
-            <div
-              key="positions"
-              className="relative bg-gray-100 dark:bg-neutral-900 rounded-lg shadow-md border border-gray-700 dark:border-gray-700"
-            >
-              <DragHandle />
-              <div className="p-4 h-full">
-                <PositionsWidget />
-              </div>
-            </div>
-          </ResponsiveGridLayout>
+          <Content />
         </div>
       </div>
     </div>

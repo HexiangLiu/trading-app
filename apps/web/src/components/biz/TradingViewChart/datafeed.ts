@@ -121,8 +121,6 @@ export class Datafeed implements IBasicDataFeed {
         volume_precision: 8,
         data_status: 'streaming',
       }
-
-      console.log('Resolved symbol info:', symbolInfo)
       onResolve(symbolInfo)
     } catch (error) {
       console.error('Error resolving symbol:', error)
@@ -137,8 +135,6 @@ export class Datafeed implements IBasicDataFeed {
     onResult: HistoryCallback,
     onError: DatafeedErrorCallback
   ): void {
-    console.log('Get bars:', periodParams.from, periodParams.to)
-
     try {
       const adapter = this.getCurrentAdapter()
       if (!adapter) {
@@ -152,10 +148,6 @@ export class Datafeed implements IBasicDataFeed {
       const timeDiff = endTime - startTime
       const intervalMs = this.getIntervalMs(resolution)
       const limit = Math.min(Math.ceil(timeDiff / intervalMs), 1000)
-
-      console.log(
-        `Fetching ${limit} bars for ${symbolInfo.ticker} ${resolution}`
-      )
 
       adapter
         .getHistoricalBars(
