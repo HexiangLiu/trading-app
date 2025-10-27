@@ -1,0 +1,23 @@
+name: Lint
+
+on:
+    pull_request:
+        branches:
+            - main
+
+jobs:
+    lint:
+        runs-on: ubuntu-latest
+        steps:
+            - name: Checkout code
+              uses: actions/checkout@v3
+            - name: Set up Node.js
+              uses: actions/setup-node@v4
+              with:
+                node-version: 20
+            - name: Setup pnpm
+              uses: pnpm/action-setup@v4
+            - name: Run Lint
+              run: |
+                pnpm add -g @biomejs/biome@2.3.0
+                pnpm run lint

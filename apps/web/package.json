@@ -7,7 +7,9 @@
     "dev": "vite --clearScreen false",
     "build": "tsc && vite build",
     "preview": "vite preview",
-    "lint": "biome lint --max-diagnostics=1000 --colors=force --write --diagnostic-level=error"
+    "lint": "biome lint --max-diagnostics=1000 --colors=force --write --diagnostic-level=error",
+    "type-check": "tsc --noEmit",
+    "lighthouse": "pnpm build && npx lhci autorun --config=./lighthouserc.json"
   },
   "dependencies": {
     "@radix-ui/react-dropdown-menu": "^2.1.16",
@@ -23,6 +25,7 @@
     "tailwindcss": "^4.1.16"
   },
   "devDependencies": {
+    "@lhci/cli": "^0.12.0",
     "@repo/typescript-config": "workspace:*",
     "@types/react": "^19.0.1",
     "@types/react-dom": "^19.0.2",
