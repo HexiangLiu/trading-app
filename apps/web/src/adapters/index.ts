@@ -16,7 +16,6 @@ export interface StreamSubscription {
 export interface ExchangeAdapter {
   // Connection management
   connect(): Promise<void>
-  disconnect(): void
   getConnectionStatus(): boolean
 
   // Dynamic subscription management
@@ -101,12 +100,6 @@ export class ExchangeAdapterManager {
     const adapter = this.adapters.get(exchange)
     if (adapter) {
       adapter.unsubscribe(symbol, streamType, interval, callback)
-
-      // Auto-disconnect if no active streams
-      if (adapter.getActiveStreams().length === 0) {
-        adapter.disconnect()
-        this.adapters.delete(exchange)
-      }
     }
   }
 
@@ -117,12 +110,6 @@ export class ExchangeAdapterManager {
     const adapter = this.adapters.get(exchange)
     if (adapter) {
       adapter.unsubscribeAll(symbol)
-
-      // Auto-disconnect if no active streams
-      if (adapter.getActiveStreams().length === 0) {
-        adapter.disconnect()
-        this.adapters.delete(exchange)
-      }
     }
   }
 
@@ -135,27 +122,6 @@ export class ExchangeAdapterManager {
   }
 
   /**
-   * Disconnect specific exchange
-   */
-  disconnect(exchange: Exchange): void {
-    const adapter = this.adapters.get(exchange)
-    if (adapter) {
-      adapter.disconnect()
-      this.adapters.delete(exchange)
-    }
-  }
-
-  /**
-   * Disconnect all exchanges
-   */
-  disconnectAll(): void {
-    for (const [, adapter] of this.adapters) {
-      adapter.disconnect()
-    }
-    this.adapters.clear()
-  }
-
-  /**
    * Get all active adapters
    */
   getActiveAdapters(): Map<Exchange, ExchangeAdapter> {
@@ -163,5 +129,11 @@ export class ExchangeAdapterManager {
   }
 }
 
-// Export singleton instance
-export const exchangeAdapterManager = new ExchangeAdapterManager()
+// Singleton instance to survive hot reloads
+// Use window object to persist across hot reloads
+export const exchangeAdapterManager = (() => {
+  if (!window.__exchangeAdapterManager) {
+    window.__exchangeAdapterManager = new ExchangeAdapterManager()
+  }
+  return window.__exchangeAdapterManager
+})()

@@ -49,7 +49,7 @@ export const OpenOrdersTab = () => {
             <span
               className={cn(
                 'px-2 py-1 rounded text-xs font-medium',
-                order.status === OrderStatus.ACCEPTED
+                order.status === OrderStatus.PENDING
                   ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
                   : 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'
               )}

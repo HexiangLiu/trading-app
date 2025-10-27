@@ -1,8 +1,9 @@
 /**
  * Exchange Adapter for Binance WebSocket Streams
- * Based on https://developers.binance.com/docs/binance-spot-api-docs/web-socket-streams#klinecandlestick-streams-with-timezone-offset
  */
 
+import type { OrderBookData } from '@/types/orderbook'
+import { getTradeWorkerManager } from '@/workers/tradeWorkerManager'
 import type { ExchangeAdapter, StreamSubscription } from '..'
 
 export interface KlineData {
@@ -18,19 +19,6 @@ export interface KlineData {
   buyBaseVolume: number
   buyQuoteVolume: number
   isClosed: boolean
-}
-
-export interface OrderBookEntry {
-  price: string
-  quantity: string
-}
-
-export interface OrderBookData {
-  lastUpdateId: number
-  bids: OrderBookEntry[]
-  asks: OrderBookEntry[]
-  symbol: string
-  timestamp: number
 }
 
 export interface BinanceKlineStream {
@@ -56,12 +44,6 @@ export interface BinanceKlineStream {
     Q: string // Taker buy quote asset volume
     B: string // Ignore
   }
-}
-
-export interface BinanceOrderBookStream {
-  lastUpdateId: number
-  bids: [string, string][] // [price, quantity]
-  asks: [string, string][] // [price, quantity]
 }
 
 export class BinanceAdapter implements ExchangeAdapter {
@@ -126,25 +108,17 @@ export class BinanceAdapter implements ExchangeAdapter {
     streamSubscriptions.push(subscription)
     this.subscriptions.set(subscriptionKey, streamSubscriptions)
 
-    // Add to active streams (only if this is the first subscription for this stream)
+    // Check if this is a new stream (first subscription for this stream)
     const isNewStream = !this.activeStreams.has(streamName)
     this.activeStreams.add(streamName)
 
-    console.log(
-      `Subscribed to stream: ${streamName}, isNewStream: ${isNewStream}`
-    )
-
-    // If not connected, connect first (connect will handle all active streams)
+    // If not connected, connect first
     if (!this.isConnected) {
       // Prevent multiple simultaneous connection attempts
       if (!this.connectingPromise) {
         this.connectingPromise = this.connect()
           .then(() => {
-            // Connection established, no need to call subscribeToStream
-            // because connect() already handles all active streams via URL
-            console.log(
-              `Connection established, stream ${streamName} will be handled automatically`
-            )
+            console.log(`Connection established for stream: ${streamName}`)
             this.connectingPromise = null
           })
           .catch(error => {
@@ -152,14 +126,12 @@ export class BinanceAdapter implements ExchangeAdapter {
             this.connectingPromise = null
           })
       }
-
-      // Wait for connection to complete
-      this.connectingPromise.then(() => {
-        // Connection completed, stream will be handled automatically
-      })
     } else if (isNewStream) {
-      // If already connected and this is a new stream, subscribe to it
+      // If already connected and this is a new stream, send SUBSCRIBE message
+      console.log(`Sending SUBSCRIBE message for new stream: ${streamName}`)
       this.subscribeToStream(streamName)
+    } else {
+      console.log(`Stream ${streamName} already active, added new callback`)
     }
   }
 
@@ -254,24 +226,20 @@ export class BinanceAdapter implements ExchangeAdapter {
           return
         }
 
-        // Build stream names from active subscriptions
-        const allStreams = Array.from(this.activeStreams)
-        if (allStreams.length === 0) {
-          console.log('No active streams to connect to')
-          resolve()
-          return
-        }
-
-        const streamsParam = allStreams.join('/')
-        const url = `${this.baseStreamUrl}/stream?streams=${streamsParam}`
+        // Connect to base WebSocket endpoint without any streams
+        const url = `${this.baseStreamUrl}/ws`
 
         console.log('Connecting to:', url)
         this.ws = new WebSocket(url)
 
         this.ws.onopen = () => {
-          console.log('Binance WebSocket Streams connected')
+          console.log('Binance WebSocket connected')
           this.isConnected = true
           this.reconnectAttempts = 0
+
+          // Subscribe to all active streams via SUBSCRIBE messages
+          this.subscribeToAllActiveStreams()
+
           resolve()
         }
 
@@ -287,11 +255,20 @@ export class BinanceAdapter implements ExchangeAdapter {
         this.ws.onclose = event => {
           console.log('Binance WebSocket closed:', event.code, event.reason)
           this.isConnected = false
+
+          // Trigger reconnection for unexpected closures (not normal closure or going away)
+          // 1000: Normal closure
+          // 1001: Going away (page refresh, navigation)
+          if (event.code !== 1000 && event.code !== 1001) {
+            console.log(
+              'Unexpected closure detected, triggering reconnection...'
+            )
+            this.handleReconnect()
+          }
         }
 
         this.ws.onerror = error => {
           console.error('Binance WebSocket error:', error)
-          reject(error)
         }
       } catch (error) {
         reject(error)
@@ -300,16 +277,50 @@ export class BinanceAdapter implements ExchangeAdapter {
   }
 
   /**
-   * Disconnect from WebSocket
+   * Subscribe to all active streams via SUBSCRIBE messages
    */
-  disconnect(): void {
-    if (this.ws) {
-      this.ws.close()
-      this.ws = null
+  private subscribeToAllActiveStreams(): void {
+    const allStreams = Array.from(this.activeStreams)
+    if (allStreams.length === 0) {
+      console.log('No active streams to subscribe to')
+      return
     }
-    this.isConnected = false
-    this.activeStreams.clear()
-    this.subscriptions.clear()
+
+    console.log('Subscribing to all active streams:', allStreams)
+
+    // Send SUBSCRIBE message for all active streams
+    const subscribeMessage = {
+      method: 'SUBSCRIBE',
+      params: allStreams,
+      id: Date.now()
+    }
+
+    if (this.ws && this.isConnected) {
+      this.ws.send(JSON.stringify(subscribeMessage))
+      console.log('Sent SUBSCRIBE message for streams:', allStreams)
+    }
+  }
+
+  /**
+   * Subscribe to a single stream via SUBSCRIBE message
+   */
+  private subscribeToStream(streamName: string): void {
+    if (!this.ws || !this.isConnected) {
+      console.warn(
+        'WebSocket not connected, cannot subscribe to stream:',
+        streamName
+      )
+      return
+    }
+
+    const subscribeMessage = {
+      method: 'SUBSCRIBE',
+      params: [streamName],
+      id: Date.now()
+    }
+
+    this.ws.send(JSON.stringify(subscribeMessage))
+    console.log('Sent SUBSCRIBE message for stream:', streamName)
   }
 
   /**
@@ -335,7 +346,7 @@ export class BinanceAdapter implements ExchangeAdapter {
       case 'depth':
         return `${symbolLower}@depth20@100ms`
       case 'trade':
-        return `${symbolLower}@trade`
+        return `${symbolLower}@aggTrade`
       default:
         throw new Error(`Unsupported stream type: ${streamType}`)
     }
@@ -352,36 +363,6 @@ export class BinanceAdapter implements ExchangeAdapter {
     // For kline streams, use the original interval for key consistency
     // The mapping to Binance format only happens in getStreamName
     return `${symbol}_${streamType}_${interval || ''}`
-  }
-
-  /**
-   * Subscribe to a specific stream
-   */
-  private subscribeToStream(streamName: string): void {
-    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
-      console.warn(
-        'WebSocket not connected, cannot subscribe to stream:',
-        streamName
-      )
-      return
-    }
-
-    // Double check: ensure we're not already subscribed to this stream
-    if (!this.activeStreams.has(streamName)) {
-      console.warn(
-        `Stream ${streamName} not in activeStreams, skipping subscription`
-      )
-      return
-    }
-
-    const subscribeMessage = {
-      method: 'SUBSCRIBE',
-      params: [streamName],
-      id: Date.now()
-    }
-
-    this.ws.send(JSON.stringify(subscribeMessage))
-    console.log('Subscribed to stream:', streamName)
   }
 
   /**
@@ -410,44 +391,68 @@ export class BinanceAdapter implements ExchangeAdapter {
    * Handle WebSocket messages
    */
   private handleMessage(data: any): void {
-    // Handle Combined stream format: {"stream":"<streamName>","data":<rawPayload>}
-    if (data.stream && data.data) {
-      const streamName = data.stream
+    // Handle SUBSCRIBE/UNSUBSCRIBE confirmation messages
+    if (data.result !== undefined && data.id !== undefined) {
+      console.log('Received subscription confirmation:', data)
+      return
+    }
 
-      // Find matching subscriptions
-      const subscriptions = this.findSubscriptionsByStreamName(streamName)
-      if (subscriptions.length === 0) {
-        console.warn('No subscriptions found for stream:', streamName)
+    // Handle raw data format (when using /ws endpoint)
+    // For depth streams, data has format: {lastUpdateId: ..., bids: ..., asks: ...}
+    if (data.lastUpdateId !== undefined && (data.bids || data.asks)) {
+      // This is a depth stream data
+      // We need to find which depth stream this belongs to
+      // Since we can't determine the exact stream from raw data, we'll distribute to all depth subscriptions
+      const depthSubscriptions = this.getSubscriptionsByType('depth')
+
+      if (depthSubscriptions.length === 0) {
+        console.warn('No depth subscriptions found for raw data')
         return
       }
 
-      // Handle different stream types and distribute to all subscribers
-      if (streamName.includes('@kline_')) {
-        this.handleKlineStream(data, subscriptions)
-      } else if (streamName.includes('@depth')) {
-        this.handleOrderBookStream(data, subscriptions)
-      } else if (streamName.includes('@trade')) {
-        this.handleTradeStream(data, subscriptions)
+      this.handleOrderBookStream(data, depthSubscriptions)
+      return
+    }
+
+    // Handle kline data format
+    if (data.e === 'kline') {
+      // This is kline data
+      const klineSubscriptions = this.getSubscriptionsByType('kline')
+
+      if (klineSubscriptions.length === 0) {
+        console.warn('No kline subscriptions found for raw data')
+        return
       }
+
+      this.handleKlineStream(data, klineSubscriptions)
+      return
+    }
+
+    // Handle trade data format (both trade and aggTrade)
+    if (data.e === 'trade' || data.e === 'aggTrade') {
+      // This is trade data
+      const tradeSubscriptions = this.getSubscriptionsByType('trade')
+
+      if (tradeSubscriptions.length === 0) {
+        console.warn('No trade subscriptions found for raw data')
+        return
+      }
+
+      this.handleTradeStream(data, tradeSubscriptions)
+      return
     }
   }
 
   /**
-   * Find all subscriptions by stream name
+   * Get all subscriptions by stream type
    */
-  private findSubscriptionsByStreamName(
-    streamName: string
+  private getSubscriptionsByType(
+    streamType: 'kline' | 'depth' | 'trade'
   ): StreamSubscription[] {
     const result: StreamSubscription[] = []
-
     for (const subscriptions of this.subscriptions.values()) {
       for (const subscription of subscriptions) {
-        const expectedStreamName = this.getStreamName(
-          subscription.symbol,
-          subscription.streamType,
-          subscription.interval
-        )
-        if (expectedStreamName === streamName) {
+        if (subscription.streamType === streamType) {
           result.push(subscription)
         }
       }
@@ -462,11 +467,11 @@ export class BinanceAdapter implements ExchangeAdapter {
     data: any,
     subscriptions: StreamSubscription[]
   ): void {
-    const streamName = data.stream
-    const klineData = data.data
+    // Handle both combined stream format (data.data) and raw data format (data)
+    const klineData = data.data || data
 
     // Check if it's a K-line data stream
-    if (streamName.includes('@kline_') && klineData.e === 'kline') {
+    if (klineData.e === 'kline') {
       const kline = this.parseKlineStream(klineData)
 
       // Convert to TradingView Bar format
@@ -494,7 +499,8 @@ export class BinanceAdapter implements ExchangeAdapter {
     data: any,
     subscriptions: StreamSubscription[]
   ): void {
-    const orderBookData = data.data
+    // Handle both combined stream format (data.data) and raw data format (data)
+    const orderBookData = data.data || data
 
     if (orderBookData) {
       const orderBook: OrderBookData = {
@@ -532,19 +538,35 @@ export class BinanceAdapter implements ExchangeAdapter {
     data: any,
     subscriptions: StreamSubscription[]
   ): void {
-    const tradeData = data.data
+    // Handle both combined stream format (data.data) and raw data format (data)
+    const tradeData = data.data || data
 
-    if (tradeData) {
+    if (tradeData && (tradeData.e === 'aggTrade' || tradeData.e === 'trade')) {
       // Convert to standard trade format
       const trade = {
-        symbol: subscriptions[0].symbol, // Use first subscription's symbol
-        price: parseFloat(tradeData.p),
-        quantity: parseFloat(tradeData.q),
-        timestamp: tradeData.T,
-        isBuyerMaker: tradeData.m
+        symbol: tradeData.s, // Symbol
+        price: parseFloat(tradeData.p), // Price
+        quantity: parseFloat(tradeData.q), // Quantity
+        timestamp: tradeData.T, // Trade time
+        isBuyerMaker: tradeData.m, // Is buyer maker
+        firstTradeId: tradeData.f, // First trade ID (for aggTrade)
+        lastTradeId: tradeData.l, // Last trade ID (for aggTrade)
+        tradeCount: tradeData.n // Number of trades (for aggTrade)
       }
 
-      // Call all subscription callbacks
+      // Send to Worker for aggregation
+      try {
+        const workerManager = getTradeWorkerManager()
+        if (workerManager.initialized) {
+          workerManager.sendTradeData(trade)
+        } else {
+          console.warn('Worker not initialized, cannot send trade data')
+        }
+      } catch (error) {
+        console.error('Failed to send trade data to worker:', error)
+      }
+
+      // Call all subscription callbacks (for backward compatibility)
       subscriptions.forEach(subscription => {
         try {
           subscription.callback(trade)
@@ -671,4 +693,11 @@ export class BinanceAdapter implements ExchangeAdapter {
   }
 }
 
-export const binanceAdapter = new BinanceAdapter()
+// Singleton instance to survive hot reloads
+// Use window object to persist across hot reloads
+export const binanceAdapter = (() => {
+  if (!window.__binanceAdapter) {
+    window.__binanceAdapter = new BinanceAdapter()
+  }
+  return window.__binanceAdapter
+})()

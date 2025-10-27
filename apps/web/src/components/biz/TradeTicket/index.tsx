@@ -47,7 +47,7 @@ export const TradeTicket = () => {
       }
     }
 
-    // Subscribe to depth stream for current instrument
+    // Subscribe to depth stream
     exchangeAdapterManager.subscribe(instrument.exchange, {
       symbol: instrument.name,
       streamType: 'depth',
@@ -60,7 +60,7 @@ export const TradeTicket = () => {
         instrument.exchange,
         instrument.name,
         'depth',
-        undefined, // interval
+        undefined,
         handleOrderBookUpdate
       )
     }
@@ -131,12 +131,16 @@ export const TradeTicket = () => {
       }
 
       try {
-        const order = await orderService.submitOrder(formData, instrument.name)
+        const order = await orderService.submitOrder(
+          formData,
+          instrument.name,
+          instrument.exchange
+        )
 
         // Add order to atom storage
         setOrders(prev => [...prev, order])
 
-        if (order.status === OrderStatus.ACCEPTED) {
+        if (order.status === OrderStatus.PENDING) {
           toast.success(`Order accepted successfully`)
           // Reset form
           setFormData({
@@ -159,6 +163,7 @@ export const TradeTicket = () => {
       formData,
       isSubmitting,
       instrument.name,
+      instrument.exchange,
       orderService,
       bestBid,
       bestAsk,

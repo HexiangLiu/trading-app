@@ -1,4 +1,9 @@
-import { useState } from 'react'
+import { useAtom } from 'jotai'
+import { useEffect, useMemo, useState } from 'react'
+import { exchangeAdapterManager } from '@/adapters'
+import { useAggregatedPrices } from '@/hooks/useAggregatedPrices'
+import { orderAtom } from '@/store/order'
+import { OrderSide, OrderStatus } from '@/types/order'
 import { cn } from '@/utils/classMerge'
 import { OpenOrdersTab } from './OpenOrdersTab'
 import { PositionsTab } from './PositionsTab'
@@ -7,6 +12,110 @@ type TabType = 'positions' | 'orders'
 
 export const PositionsWidget = () => {
   const [activeTab, setActiveTab] = useState<TabType>('positions')
+  const [orders, setOrders] = useAtom(orderAtom)
+  const { prices, subscribe, unsubscribe } = useAggregatedPrices()
+
+  // Get all pending orders
+  const pendingOrders = useMemo(() => {
+    const pending = orders.filter(order => order.status === OrderStatus.PENDING)
+    return pending
+  }, [orders])
+
+  // Get unique exchange-symbol combinations from pending orders
+  const pendingOrderInstruments = useMemo(() => {
+    const instruments = new Map<string, { exchange: string; symbol: string }>()
+
+    pendingOrders.forEach(order => {
+      const key = `${order.exchange}:${order.symbol}`
+      if (!instruments.has(key)) {
+        instruments.set(key, {
+          exchange: order.exchange,
+          symbol: order.symbol
+        })
+      }
+    })
+
+    const result = Array.from(instruments.values())
+    return result
+  }, [pendingOrders])
+
+  // Subscribe to trade streams for pending order instruments
+  useEffect(() => {
+    console.log('Subscribing to instruments:', pendingOrderInstruments)
+
+    pendingOrderInstruments.forEach(({ exchange, symbol }) => {
+      console.log(`Subscribing to ${exchange}:${symbol}`)
+
+      // Subscribe to trade stream for this exchange-symbol combination
+      exchangeAdapterManager.subscribe(exchange as any, {
+        symbol,
+        streamType: 'trade',
+        callback: () => {} // Empty callback, data goes to Worker
+      })
+
+      // Subscribe to aggregated prices
+      subscribe(symbol)
+    })
+
+    return () => {
+      console.log('Cleaning up subscriptions')
+      // Cleanup subscriptions
+      pendingOrderInstruments.forEach(({ exchange, symbol }) => {
+        exchangeAdapterManager.unsubscribe(
+          exchange as any,
+          symbol,
+          'trade',
+          undefined
+        )
+        unsubscribe(symbol)
+      })
+    }
+  }, [pendingOrderInstruments, subscribe, unsubscribe])
+
+  // Process aggregated prices to fill orders
+  useEffect(() => {
+    if (Object.keys(prices).length === 0) return
+
+    const updatedOrders = orders.map(order => {
+      if (order.status !== OrderStatus.PENDING) return order
+
+      const priceData = prices[order.symbol]
+      if (!priceData) return order
+
+      const tradePrice = priceData.price
+
+      // Check if buy order should be filled (order price >= trade price)
+      if (order.side === OrderSide.BUY && order.price >= tradePrice) {
+        return {
+          ...order,
+          status: OrderStatus.FILLED,
+          filledQuantity: order.quantity,
+          averagePrice: tradePrice
+        }
+      }
+
+      // Check if sell order should be filled (order price <= trade price)
+      if (order.side === OrderSide.SELL && order.price <= tradePrice) {
+        return {
+          ...order,
+          status: OrderStatus.FILLED,
+          filledQuantity: order.quantity,
+          averagePrice: tradePrice
+        }
+      }
+
+      return order
+    })
+
+    // Only update if there are changes
+    const hasChanges = updatedOrders.some(
+      (order, index) => order.status !== orders[index].status
+    )
+
+    if (hasChanges) {
+      setOrders(updatedOrders)
+    }
+  }, [prices, orders, setOrders])
 
   return (
     <div className="bg-gray-100 dark:bg-neutral-900 rounded-lg border border-gray-200 dark:border-gray-700 p-4">

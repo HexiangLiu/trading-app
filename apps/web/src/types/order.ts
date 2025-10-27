@@ -13,7 +13,6 @@ export enum OrderType {
 
 export enum OrderStatus {
   PENDING = 'PENDING',
-  ACCEPTED = 'ACCEPTED',
   REJECTED = 'REJECTED',
   FILLED = 'FILLED',
   CANCELLED = 'CANCELLED'
@@ -22,6 +21,7 @@ export enum OrderStatus {
 export interface Order {
   id: string
   symbol: string
+  exchange: string
   side: OrderSide
   type: OrderType
   price: number

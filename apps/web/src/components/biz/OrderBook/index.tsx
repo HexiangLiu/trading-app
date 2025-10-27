@@ -71,7 +71,7 @@ export const OrderBook = memo(() => {
   )
 
   useEffect(() => {
-    // Subscribe to depth stream for current instrument
+    // Subscribe to depth stream
     exchangeAdapterManager.subscribe(instrument.exchange, {
       symbol: instrument.name,
       streamType: 'depth',
@@ -84,7 +84,7 @@ export const OrderBook = memo(() => {
         instrument.exchange,
         instrument.name,
         'depth',
-        undefined, // interval
+        undefined,
         throttledUpdate
       )
     }

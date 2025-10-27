@@ -8,7 +8,11 @@ export class OrderService {
   /**
    * Submit a new order (mock implementation)
    */
-  async submitOrder(formData: OrderFormData, symbol: string): Promise<Order> {
+  async submitOrder(
+    formData: OrderFormData,
+    symbol: string,
+    exchange: string
+  ): Promise<Order> {
     // Simulate network delay
     await new Promise(resolve => setTimeout(resolve, Math.random() * 200 + 50))
 
@@ -16,6 +20,7 @@ export class OrderService {
     const order: Order = {
       id: this.generateOrderId(),
       symbol,
+      exchange,
       side: formData.side,
       type: OrderType.LIMIT,
       price: parseFloat(formData.price),
@@ -39,6 +44,6 @@ export class OrderService {
    * Simulate order status (90% accepted, 10% rejected)
    */
   private simulateOrderStatus(): OrderStatus {
-    return Math.random() > 0.1 ? OrderStatus.ACCEPTED : OrderStatus.REJECTED
+    return Math.random() > 0.1 ? OrderStatus.PENDING : OrderStatus.REJECTED
   }
 }
