@@ -9,6 +9,7 @@ import { positionsAtom } from '@/store/pnl'
 import type { OrderFormData } from '@/types/order'
 import { OrderSide, OrderStatus } from '@/types/order'
 import { cn } from '@/utils/classMerge'
+import { sanitizeInput } from '@/utils/sanitize'
 import { validateOrder } from './utils/validation'
 
 export const TradeTicket = memo(() => {
@@ -102,7 +103,10 @@ export const TradeTicket = memo(() => {
 
   const handleInputChange = useCallback(
     (field: keyof OrderFormData, value: string | boolean) => {
-      console.log('handleInputChange', field, value)
+      // Sanitize all string inputs to prevent XSS attacks
+      if (typeof value === 'string') {
+        value = sanitizeInput(value)
+      }
       setFormData(prev => ({ ...prev, [field]: value }))
     },
     []
