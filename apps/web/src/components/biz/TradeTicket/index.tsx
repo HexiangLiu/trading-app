@@ -184,7 +184,7 @@ export const TradeTicket = memo(() => {
   )
 
   return (
-    <div className="h-full bg-gray-200 dark:bg-neutral-900 border border-gray-200 dark:border-gray-700 rounded-lg p-4">
+    <div className="h-full bg-gray-200 dark:bg-neutral-900 rounded-lg p-4">
       <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
         Trade Ticket
       </h3>
@@ -192,9 +192,6 @@ export const TradeTicket = memo(() => {
       <form onSubmit={handleSubmit} className="space-y-4">
         {/* Order Side */}
         <div>
-          <div className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-            Side
-          </div>
           <div className="flex space-x-2">
             <button
               type="button"

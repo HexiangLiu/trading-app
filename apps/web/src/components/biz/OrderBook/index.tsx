@@ -143,10 +143,16 @@ export const OrderBook = memo(() => {
       </div>
 
       {/* Column Headers */}
-      <div className="flex items-center justify-between px-3 py-2  border-b border-gray-300 dark:border-gray-700 text-xs dark:text-gray-400 text-neutral-900">
-        <span>Price(USDT)</span>
-        <span>Size(USDT)</span>
-        <span>Sum(USDT)</span>
+      <div className="text-xxs sm:text-xs flex items-center justify-between px-3 py-2  border-b border-gray-300 dark:border-gray-700 text-xs dark:text-gray-400 text-neutral-900">
+        <span>
+          Price<span className="hidden sm:inline">(USDT)</span>
+        </span>
+        <span>
+          Size<span className="hidden sm:inline">(USDT)</span>
+        </span>
+        <span>
+          Sum<span className="hidden sm:inline">(USDT)</span>
+        </span>
       </div>
 
       {/* Order Book Content */}

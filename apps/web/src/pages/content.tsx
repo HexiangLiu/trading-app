@@ -1,6 +1,11 @@
 import { useAtom } from 'jotai'
-import { memo, useCallback, useMemo } from 'react'
-import { type Layout, Responsive, WidthProvider } from 'react-grid-layout'
+import { memo, useCallback, useEffect, useMemo, useState } from 'react'
+import {
+  type Layout,
+  type Layouts,
+  Responsive,
+  WidthProvider
+} from 'react-grid-layout'
 import { InstrumentSelector } from '@/components/biz/InstrumentSelector'
 import { OrderBook } from '@/components/biz/OrderBook'
 import { PositionsWidget } from '@/components/biz/PositionsWidget'
@@ -13,15 +18,25 @@ import 'react-grid-layout/css/styles.css'
 const ResponsiveGridLayout = WidthProvider(Responsive)
 
 const DragHandle = () => (
-  <span className="drag-handle absolute opacity-10 h-2 top-0 inset-x-0 mx-auto block z-10 cursor-grab active:cursor-grabbing" />
+  <span className="hidden lg:inline-block drag-handle absolute opacity-10 h-2 top-0 inset-x-0 mx-auto z-10 cursor-grab active:cursor-grabbing" />
 )
 
 export const Content = memo(() => {
   const [layouts, setLayouts] = useAtom(layoutAtom)
+  const [isLargeScreen, setIsLargeScreen] = useState(false)
+
+  useEffect(() => {
+    const checkScreenSize = throttle(() => {
+      setIsLargeScreen(window.innerWidth >= 1024)
+    }, 200)
+    checkScreenSize()
+    window.addEventListener('resize', checkScreenSize)
+    return () => window.removeEventListener('resize', checkScreenSize)
+  }, [])
 
   const handleLayoutChange = useCallback(
-    (layout: Layout[]) => {
-      setLayouts({ lg: layout })
+    (_layout: Layout[], allLayouts: Layouts) => {
+      setLayouts(allLayouts)
     },
     [setLayouts]
   )
@@ -51,11 +66,11 @@ export const Content = memo(() => {
     <ResponsiveGridLayout
       className="layout"
       layouts={layouts}
-      breakpoints={{ lg: 1200 }}
-      cols={{ lg: 12 }}
+      breakpoints={{ md: 1024, sm: 768, xs: 640, xxs: 320 }}
+      cols={{ md: 12, sm: 12, xs: 12, xxs: 12 }}
       rowHeight={70}
-      isDraggable={true}
-      isResizable={true}
+      isDraggable={isLargeScreen}
+      isResizable={isLargeScreen}
       margin={[4, 4]}
       containerPadding={[0, 0]}
       useCSSTransforms={true}
@@ -69,7 +84,7 @@ export const Content = memo(() => {
     >
       <div
         key="instrument"
-        className="relative flex items-center bg-gray-200 dark:bg-neutral-900 rounded-lg shadow-md p-4 border border-gray-200 dark:border-gray-700"
+        className="relative flex items-center bg-gray-200 dark:bg-neutral-900 rounded-lg shadow-md border border-gray-200 dark:border-gray-700"
       >
         <DragHandle />
         <InstrumentSelector />
@@ -98,7 +113,7 @@ export const Content = memo(() => {
         className="relative bg-gray-200 dark:bg-neutral-900 rounded-lg shadow-md border border-gray-200 dark:border-gray-700"
       >
         <DragHandle />
-        <div className="-4 h-full">
+        <div className="p-0 sm:p-4 h-full">
           <TradeTicket />
         </div>
       </div>
@@ -108,7 +123,7 @@ export const Content = memo(() => {
         className="relative bg-gray-200 dark:bg-neutral-900 rounded-lg shadow-md border border-gray-200 dark:border-gray-700 overflow-y-auto"
       >
         <DragHandle />
-        <div className="p-4 h-full">
+        <div className="p-0 sm:p-4 h-full">
           <PositionsWidget />
         </div>
       </div>

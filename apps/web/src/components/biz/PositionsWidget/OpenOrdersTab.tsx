@@ -57,7 +57,7 @@ export const OpenOrdersTab = memo(() => {
               {order.status}
             </span>
           </div>
-          <div className="grid grid-cols-3 gap-4 text-sm">
+          <div className="grid grid-cols-3 gap-4 text-xs sm:text-sm">
             <div>
               <div className="text-gray-500 dark:text-gray-400">Quantity</div>
               <div className="font-mono">{order.quantity.toFixed(4)}</div>

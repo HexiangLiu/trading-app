@@ -25,14 +25,14 @@ export const OrderBookRow = memo<{
       {/* Content */}
       <div className="relative z-10 flex w-full items-center justify-between">
         <span
-          className={`font-mono ${type === 'bid' ? 'text-green-400' : 'text-red-400'}`}
+          className={`text-xs sm:text-sm font-mono ${type === 'bid' ? 'text-green-400' : 'text-red-400'}`}
         >
           {entry.price.toFixed(2)}
         </span>
-        <span className="flex-1 font-mono dark:text-white text-neutral-900 text-right">
+        <span className="text-xs sm:text-sm flex-1 font-mono dark:text-white text-neutral-900 text-right">
           {entry.quantity.toFixed(4)}
         </span>
-        <span className="flex-1 font-mono dark:text-white text-neutral-900 text-xs text-right">
+        <span className="flex-1 font-mono dark:text-white text-neutral-900 text-xxs sm:text-xs text-right">
           {entry.total.toFixed(4)}
         </span>
       </div>

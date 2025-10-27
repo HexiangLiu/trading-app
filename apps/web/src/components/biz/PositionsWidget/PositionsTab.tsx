@@ -20,12 +20,12 @@ export const PositionsTab = memo(() => {
       {/* PnL Summary */}
       <div className="grid grid-cols-2 gap-4">
         <div className="bg-white dark:bg-gray-800 rounded-lg p-4 border border-gray-200 dark:border-gray-700">
-          <div className="text-sm text-gray-500 dark:text-gray-400">
+          <div className="text-xs sm:text-sm text-gray-500 dark:text-gray-400">
             Unrealized PnL
           </div>
           <div
             className={cn(
-              'text-lg font-semibold',
+              'text-base sm:text-lg font-semibold',
               pnlData.totalUnrealizedPnL >= 0
                 ? 'text-green-600 dark:text-green-400'
                 : 'text-red-600 dark:text-red-400'
@@ -36,12 +36,12 @@ export const PositionsTab = memo(() => {
           </div>
         </div>
         <div className="bg-white dark:bg-gray-800 rounded-lg p-4 border border-gray-200 dark:border-gray-700">
-          <div className="text-sm text-gray-500 dark:text-gray-400">
+          <div className="text-xs sm:text-sm text-gray-500 dark:text-gray-400">
             Realized PnL
           </div>
           <div
             className={cn(
-              'text-lg font-semibold',
+              'text-base sm:text-lg font-semibold',
               pnlData.totalRealizedPnL >= 0
                 ? 'text-green-600 dark:text-green-400'
                 : 'text-red-600 dark:text-red-400'
@@ -69,17 +69,16 @@ export const PositionsTab = memo(() => {
                   {position.exchange}
                 </span>
               </div>
-              <div className="text-right text-sm text-gray-500 dark:text-gray-400">
-                {new Date(position.lastUpdate).toLocaleTimeString()}
-              </div>
             </div>
             <div className="grid grid-cols-2 gap-4 text-sm">
               <div>
-                <div className="text-gray-500 dark:text-gray-400">Quantity</div>
+                <div className="text-xs sm:text-sm text-gray-500 dark:text-gray-400">
+                  Quantity
+                </div>
                 <div className="font-mono">{position.quantity.toFixed(4)}</div>
               </div>
               <div>
-                <div className="text-gray-500 dark:text-gray-400">
+                <div className="text-xs sm:text-sm text-gray-500 dark:text-gray-400">
                   Avg Price
                 </div>
                 <div className="font-mono">
@@ -89,7 +88,7 @@ export const PositionsTab = memo(() => {
             </div>
             <div className="grid grid-cols-2 gap-4 text-sm mt-2">
               <div>
-                <div className="text-gray-500 dark:text-gray-400">
+                <div className="text-xs sm:text-sm text-gray-500 dark:text-gray-400">
                   Unrealized PnL
                 </div>
                 <div
@@ -105,7 +104,7 @@ export const PositionsTab = memo(() => {
                 </div>
               </div>
               <div>
-                <div className="text-gray-500 dark:text-gray-400">
+                <div className="text-xs sm:text-sm text-gray-500 dark:text-gray-400">
                   Realized PnL
                 </div>
                 <div
