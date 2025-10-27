@@ -1,74 +1,129 @@
-import { useAtomValue } from 'jotai'
-import { useMemo } from 'react'
-import { orderAtom } from '@/store/order'
-import { OrderSide, OrderStatus } from '@/types/order'
+import { useAtom } from 'jotai'
+import { memo } from 'react'
+import { pnlAtom } from '@/store/pnl'
 import { cn } from '@/utils/classMerge'
 
-export const PositionsTab = () => {
-  const orders = useAtomValue(orderAtom)
+export const PositionsTab = memo(() => {
+  const [pnlData] = useAtom(pnlAtom)
 
-  // Get all filled orders
-  const filledOrders = useMemo(() => {
-    return orders.filter(order => order.status === OrderStatus.FILLED)
-  }, [orders])
-
-  if (filledOrders.length === 0) {
+  if (pnlData.positions.length === 0) {
     return (
       <div className="text-center py-8 text-gray-500 dark:text-gray-400">
-        <p>No filled orders</p>
-        <p className="text-sm mt-1">Your filled orders will appear here</p>
+        <p>No open positions</p>
+        <p className="text-sm mt-1">Your positions will appear here</p>
       </div>
     )
   }
 
   return (
-    <div className="space-y-3">
-      {filledOrders.map(order => (
-        <div
-          key={order.id}
-          className="border border-gray-200 dark:border-gray-600 rounded-lg p-3"
-        >
-          <div className="flex items-center justify-between mb-2">
-            <div className="flex items-center space-x-2">
-              <span className="font-semibold text-gray-900 dark:text-white">
-                {order.symbol}
-              </span>
-              <span
-                className={cn(
-                  'px-2 py-1 rounded text-xs font-medium',
-                  order.side === OrderSide.BUY
-                    ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
-                    : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
-                )}
-              >
-                {order.side}
-              </span>
-              <span className="px-2 py-1 rounded text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
-                FILLED
-              </span>
-            </div>
-            <div className="text-right text-sm text-gray-500 dark:text-gray-400">
-              {new Date(order.timestamp).toLocaleString()}
-            </div>
+    <div className="space-y-4">
+      {/* PnL Summary */}
+      <div className="grid grid-cols-2 gap-4">
+        <div className="bg-white dark:bg-gray-800 rounded-lg p-4 border border-gray-200 dark:border-gray-700">
+          <div className="text-sm text-gray-500 dark:text-gray-400">
+            Unrealized PnL
           </div>
-          <div className="grid grid-cols-3 gap-4 text-sm">
-            <div>
-              <div className="text-gray-500 dark:text-gray-400">Quantity</div>
-              <div className="font-mono">{order.quantity.toFixed(4)}</div>
+          <div
+            className={cn(
+              'text-lg font-semibold',
+              pnlData.totalUnrealizedPnL >= 0
+                ? 'text-green-600 dark:text-green-400'
+                : 'text-red-600 dark:text-red-400'
+            )}
+          >
+            {pnlData.totalUnrealizedPnL >= 0 ? '+' : ''}
+            {pnlData.totalUnrealizedPnL.toFixed(2)} USDT
+          </div>
+        </div>
+        <div className="bg-white dark:bg-gray-800 rounded-lg p-4 border border-gray-200 dark:border-gray-700">
+          <div className="text-sm text-gray-500 dark:text-gray-400">
+            Realized PnL
+          </div>
+          <div
+            className={cn(
+              'text-lg font-semibold',
+              pnlData.totalRealizedPnL >= 0
+                ? 'text-green-600 dark:text-green-400'
+                : 'text-red-600 dark:text-red-400'
+            )}
+          >
+            {pnlData.totalRealizedPnL >= 0 ? '+' : ''}
+            {pnlData.totalRealizedPnL.toFixed(2)} USDT
+          </div>
+        </div>
+      </div>
+
+      {/* Positions List */}
+      <div className="space-y-3">
+        {pnlData.positions.map((position, index) => (
+          <div
+            key={`${position.symbol}-${position.exchange}-${index}`}
+            className="border border-gray-200 dark:border-gray-600 rounded-lg p-3"
+          >
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center space-x-2">
+                <span className="font-semibold text-gray-900 dark:text-white">
+                  {position.symbol}
+                </span>
+                <span className="px-2 py-1 rounded text-xs font-medium bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200">
+                  {position.exchange}
+                </span>
+              </div>
+              <div className="text-right text-sm text-gray-500 dark:text-gray-400">
+                {new Date(position.lastUpdate).toLocaleTimeString()}
+              </div>
             </div>
-            <div>
-              <div className="text-gray-500 dark:text-gray-400">Price</div>
-              <div className="font-mono">{order.price.toFixed(2)}</div>
+            <div className="grid grid-cols-2 gap-4 text-sm">
+              <div>
+                <div className="text-gray-500 dark:text-gray-400">Quantity</div>
+                <div className="font-mono">{position.quantity.toFixed(4)}</div>
+              </div>
+              <div>
+                <div className="text-gray-500 dark:text-gray-400">
+                  Avg Price
+                </div>
+                <div className="font-mono">
+                  {position.averagePrice.toFixed(2)} USDT
+                </div>
+              </div>
             </div>
-            <div>
-              <div className="text-gray-500 dark:text-gray-400">Total</div>
-              <div className="font-mono">
-                {(order.quantity * order.price).toFixed(2)}
+            <div className="grid grid-cols-2 gap-4 text-sm mt-2">
+              <div>
+                <div className="text-gray-500 dark:text-gray-400">
+                  Unrealized PnL
+                </div>
+                <div
+                  className={cn(
+                    'font-mono',
+                    position.unrealizedPnL >= 0
+                      ? 'text-green-600 dark:text-green-400'
+                      : 'text-red-600 dark:text-red-400'
+                  )}
+                >
+                  {position.unrealizedPnL >= 0 ? '+' : ''}
+                  {position.unrealizedPnL.toFixed(2)} USDT
+                </div>
+              </div>
+              <div>
+                <div className="text-gray-500 dark:text-gray-400">
+                  Realized PnL
+                </div>
+                <div
+                  className={cn(
+                    'font-mono',
+                    position.realizedPnL >= 0
+                      ? 'text-green-600 dark:text-green-400'
+                      : 'text-red-600 dark:text-red-400'
+                  )}
+                >
+                  {position.realizedPnL >= 0 ? '+' : ''}
+                  {position.realizedPnL.toFixed(2)} USDT
+                </div>
               </div>
             </div>
           </div>
-        </div>
-      ))}
+        ))}
+      </div>
     </div>
   )
-}
+})

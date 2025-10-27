@@ -69,7 +69,7 @@ export const Content = memo(() => {
     >
       <div
         key="instrument"
-        className="relative flex items-center bg-gray-100 dark:bg-neutral-900 rounded-lg shadow-md p-4 border border-gray-200 dark:border-gray-700"
+        className="relative flex items-center bg-gray-200 dark:bg-neutral-900 rounded-lg shadow-md p-4 border border-gray-200 dark:border-gray-700"
       >
         <DragHandle />
         <InstrumentSelector />
@@ -77,7 +77,7 @@ export const Content = memo(() => {
 
       <div
         key="chart"
-        className="relative bg-gray-100 dark:bg-neutral-900 rounded-lg shadow-md border border-gray-700 dark:border-gray-700"
+        className="relative bg-gray-200 dark:bg-neutral-900 rounded-lg shadow-md border border-gray-200 dark:border-gray-700"
       >
         <DragHandle />
         <TradingViewChart />
@@ -85,7 +85,7 @@ export const Content = memo(() => {
 
       <div
         key="orderbook"
-        className="relative bg-gray-100 dark:bg-neutral-900 rounded-lg shadow-md border border-gray-700 dark:border-gray-700"
+        className="relative bg-gray-200 dark:bg-neutral-900 rounded-lg shadow-md border border-gray-200 dark:border-gray-700"
       >
         <DragHandle />
         <div className="pt-4 h-full">
@@ -95,7 +95,7 @@ export const Content = memo(() => {
 
       <div
         key="ticket"
-        className="relative bg-gray-100 dark:bg-neutral-900 rounded-lg shadow-md border border-gray-700 dark:border-gray-700"
+        className="relative bg-gray-200 dark:bg-neutral-900 rounded-lg shadow-md border border-gray-200 dark:border-gray-700"
       >
         <DragHandle />
         <div className="-4 h-full">
@@ -105,7 +105,7 @@ export const Content = memo(() => {
 
       <div
         key="positions"
-        className="relative bg-gray-100 dark:bg-neutral-900 rounded-lg shadow-md border border-gray-700 dark:border-gray-700"
+        className="relative bg-gray-200 dark:bg-neutral-900 rounded-lg shadow-md border border-gray-200 dark:border-gray-700 overflow-y-auto"
       >
         <DragHandle />
         <div className="p-4 h-full">

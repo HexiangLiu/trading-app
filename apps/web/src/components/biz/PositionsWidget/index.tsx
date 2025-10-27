@@ -1,7 +1,8 @@
 import { useAtom } from 'jotai'
-import { useEffect, useMemo, useState } from 'react'
+import { memo, useEffect, useMemo, useState } from 'react'
 import { exchangeAdapterManager } from '@/adapters'
 import { useAggregatedPrices } from '@/hooks/useAggregatedPrices'
+import { usePnL } from '@/hooks/usePnL'
 import { orderAtom } from '@/store/order'
 import { OrderSide, OrderStatus } from '@/types/order'
 import { cn } from '@/utils/classMerge'
@@ -10,22 +11,19 @@ import { PositionsTab } from './PositionsTab'
 
 type TabType = 'positions' | 'orders'
 
-export const PositionsWidget = () => {
+export const PositionsWidget = memo(() => {
   const [activeTab, setActiveTab] = useState<TabType>('positions')
   const [orders, setOrders] = useAtom(orderAtom)
   const { prices, subscribe, unsubscribe } = useAggregatedPrices()
 
-  // Get all pending orders
-  const pendingOrders = useMemo(() => {
-    const pending = orders.filter(order => order.status === OrderStatus.PENDING)
-    return pending
-  }, [orders])
+  // usePnL automatically updates orders in Worker
+  usePnL(orders)
 
-  // Get unique exchange-symbol combinations from pending orders
-  const pendingOrderInstruments = useMemo(() => {
+  // Get unique exchange-symbol combinations from all orders
+  const orderInstruments = useMemo(() => {
     const instruments = new Map<string, { exchange: string; symbol: string }>()
 
-    pendingOrders.forEach(order => {
+    orders.forEach(order => {
       const key = `${order.exchange}:${order.symbol}`
       if (!instruments.has(key)) {
         instruments.set(key, {
@@ -37,13 +35,14 @@ export const PositionsWidget = () => {
 
     const result = Array.from(instruments.values())
     return result
-  }, [pendingOrders])
+  }, [orders])
 
-  // Subscribe to trade streams for pending order instruments
+  // Subscribe to trade streams for all order instruments
   useEffect(() => {
-    console.log('Subscribing to instruments:', pendingOrderInstruments)
+    console.log('orderInstruments', orderInstruments)
+    console.log('Subscribing to instruments:', orderInstruments)
 
-    pendingOrderInstruments.forEach(({ exchange, symbol }) => {
+    orderInstruments.forEach(({ exchange, symbol }) => {
       console.log(`Subscribing to ${exchange}:${symbol}`)
 
       // Subscribe to trade stream for this exchange-symbol combination
@@ -60,7 +59,7 @@ export const PositionsWidget = () => {
     return () => {
       console.log('Cleaning up subscriptions')
       // Cleanup subscriptions
-      pendingOrderInstruments.forEach(({ exchange, symbol }) => {
+      orderInstruments.forEach(({ exchange, symbol }) => {
         exchangeAdapterManager.unsubscribe(
           exchange as any,
           symbol,
@@ -70,7 +69,7 @@ export const PositionsWidget = () => {
         unsubscribe(symbol)
       })
     }
-  }, [pendingOrderInstruments, subscribe, unsubscribe])
+  }, [orderInstruments, subscribe, unsubscribe])
 
   // Process aggregated prices to fill orders
   useEffect(() => {
@@ -88,9 +87,7 @@ export const PositionsWidget = () => {
       if (order.side === OrderSide.BUY && order.price >= tradePrice) {
         return {
           ...order,
-          status: OrderStatus.FILLED,
-          filledQuantity: order.quantity,
-          averagePrice: tradePrice
+          status: OrderStatus.FILLED
         }
       }
 
@@ -98,9 +95,7 @@ export const PositionsWidget = () => {
       if (order.side === OrderSide.SELL && order.price <= tradePrice) {
         return {
           ...order,
-          status: OrderStatus.FILLED,
-          filledQuantity: order.quantity,
-          averagePrice: tradePrice
+          status: OrderStatus.FILLED
         }
       }
 
@@ -126,14 +121,14 @@ export const PositionsWidget = () => {
       </div>
 
       {/* Tab Navigation */}
-      <div className="flex space-x-1 mb-4 bg-gray-100 dark:bg-gray-700 rounded-lg p-1">
+      <div className="flex space-x-1 mb-4 bg-gray-100 dark:bg-gray-800 rounded-lg p-1">
         <button
           onClick={() => setActiveTab('positions')}
           className={cn(
             'flex-1 py-2 px-3 rounded-md text-sm font-medium transition-colors cursor-pointer',
             activeTab === 'positions'
-              ? 'bg-white dark:bg-gray-600 text-gray-900 dark:text-white shadow-sm'
-              : 'text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white'
+              ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
+              : 'bg-white/50 dark:bg-transparent text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
           )}
         >
           Positions
@@ -143,8 +138,8 @@ export const PositionsWidget = () => {
           className={cn(
             'flex-1 py-2 px-3 rounded-md text-sm font-medium transition-colors cursor-pointer',
             activeTab === 'orders'
-              ? 'bg-white dark:bg-gray-600 text-gray-900 dark:text-white shadow-sm'
-              : 'text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white'
+              ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
+              : 'bg-white/50 dark:bg-transparent text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
           )}
         >
           Open Orders
@@ -158,4 +153,4 @@ export const PositionsWidget = () => {
       </div>
     </div>
   )
-}
+})

@@ -136,14 +136,14 @@ export const OrderBook = memo(() => {
   }
 
   return (
-    <div className="h-full flex flex-col text-white">
+    <div className="h-full flex flex-col text-gray-900 dark:text-white">
       {/* Header */}
-      <div className="flex items-center justify-between p-3 border-b border-gray-700">
+      <div className="flex items-center justify-between p-3 border-b border-gray-300 dark:border-gray-700">
         <h3 className="font-semibold text-lg">Order Book</h3>
       </div>
 
       {/* Column Headers */}
-      <div className="flex items-center justify-between px-3 py-2  border-b border-gray-700 text-xs text-gray-400">
+      <div className="flex items-center justify-between px-3 py-2  border-b border-gray-300 dark:border-gray-700 text-xs dark:text-gray-400 text-neutral-900">
         <span>Price(USDT)</span>
         <span>Size(USDT)</span>
         <span>Sum(USDT)</span>

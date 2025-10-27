@@ -1,5 +1,5 @@
 /**
- * Hook for managing aggregated trade prices from Worker - 简化版本
+ * Hook for managing aggregated trade prices from Worker
  */
 
 import { useCallback, useEffect, useState } from 'react'

@@ -47,3 +47,6 @@ export class OrderService {
     return Math.random() > 0.1 ? OrderStatus.PENDING : OrderStatus.REJECTED
   }
 }
+
+// Export singleton instance
+export const orderService = new OrderService()

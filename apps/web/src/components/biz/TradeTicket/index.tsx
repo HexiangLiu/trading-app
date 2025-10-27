@@ -1,19 +1,20 @@
-import { useAtom, useAtomValue } from 'jotai'
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useAtomValue, useSetAtom } from 'jotai'
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { toast } from 'react-toastify'
 import { exchangeAdapterManager } from '@/adapters'
-import { OrderService } from '@/services/orderService'
+import { orderService } from '@/services/orderService'
 import { instrumentAtom } from '@/store/instrument'
 import { orderAtom } from '@/store/order'
+import { positionsAtom } from '@/store/pnl'
 import type { OrderFormData } from '@/types/order'
 import { OrderSide, OrderStatus } from '@/types/order'
 import { cn } from '@/utils/classMerge'
 import { validateOrder } from './utils/validation'
 
-export const TradeTicket = () => {
+export const TradeTicket = memo(() => {
   const instrument = useAtomValue(instrumentAtom)
-  const [, setOrders] = useAtom(orderAtom)
-  const orderService = new OrderService()
+  const setOrders = useSetAtom(orderAtom)
+  const positions = useAtomValue(positionsAtom)
 
   const [formData, setFormData] = useState<OrderFormData>({
     price: '',
@@ -123,7 +124,14 @@ export const TradeTicket = () => {
       if (isSubmitting) return
       e.preventDefault()
       setIsSubmitting(true)
-      const validationResult = validateOrder(formData, bestBid, bestAsk)
+      const validationResult = validateOrder(
+        formData,
+        bestBid,
+        bestAsk,
+        positions,
+        instrument.name,
+        instrument.exchange
+      )
       if (!validationResult.isValid) {
         toast.error(validationResult.errors.join(', '))
         setIsSubmitting(false)
@@ -164,15 +172,15 @@ export const TradeTicket = () => {
       isSubmitting,
       instrument.name,
       instrument.exchange,
-      orderService,
       bestBid,
       bestAsk,
-      setOrders
+      setOrders,
+      positions
     ]
   )
 
   return (
-    <div className="h-full bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg p-4">
+    <div className="h-full bg-gray-200 dark:bg-neutral-900 border border-gray-200 dark:border-gray-700 rounded-lg p-4">
       <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
         Trade Ticket
       </h3>
@@ -288,4 +296,4 @@ export const TradeTicket = () => {
       </form>
     </div>
   )
-}
+})

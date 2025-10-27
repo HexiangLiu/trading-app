@@ -73,8 +73,6 @@ export class Datafeed implements IBasicDataFeed {
     onResolve: ResolveCallback,
     onError: DatafeedErrorCallback
   ): void {
-    console.log('Resolve symbol:', symbolName)
-
     try {
       if (!symbolName || symbolName.trim() === '') {
         onError('Invalid symbol name')
@@ -154,7 +152,6 @@ export class Datafeed implements IBasicDataFeed {
           )
         })
         .then((bars: any[]) => {
-          console.log(`Received ${bars.length} bars from adapter`)
           onResult(bars, { noData: bars.length === 0 })
         })
         .catch((error: any) => {

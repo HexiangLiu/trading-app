@@ -1,4 +1,4 @@
-import type { TradeData, WorkerMessage } from './tradeAggregator'
+import type { Order, TradeData, WorkerMessage } from './tradeAggregator'
 
 export class TradeWorkerManager {
   private worker: Worker | null = null
@@ -72,6 +72,17 @@ export class TradeWorkerManager {
     })
   }
 
+  updateOrders(orders: Order[]) {
+    if (!this.worker || !this.isInitialized) {
+      return
+    }
+
+    this.sendMessage({
+      type: 'ORDERS_UPDATE',
+      data: { orders }
+    })
+  }
+
   onMessage(type: string, handler: (data: any) => void) {
     this.messageHandlers.set(type, handler)
   }
@@ -100,7 +111,6 @@ export class TradeWorkerManager {
   }
 }
 
-// 单例实例
 let tradeWorkerManager: TradeWorkerManager | null = null
 
 export function getTradeWorkerManager(): TradeWorkerManager {

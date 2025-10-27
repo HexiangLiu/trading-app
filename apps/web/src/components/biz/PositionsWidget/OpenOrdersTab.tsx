@@ -1,10 +1,10 @@
 import { useAtomValue } from 'jotai'
-import { useMemo } from 'react'
+import { memo, useMemo } from 'react'
 import { orderAtom } from '@/store/order'
 import { OrderStatus } from '@/types/order'
 import { cn } from '@/utils/classMerge'
 
-export const OpenOrdersTab = () => {
+export const OpenOrdersTab = memo(() => {
   const orders = useAtomValue(orderAtom)
 
   const openOrders = useMemo(() => {
@@ -64,12 +64,12 @@ export const OpenOrdersTab = () => {
             </div>
             <div>
               <div className="text-gray-500 dark:text-gray-400">Price</div>
-              <div className="font-mono">{order.price.toFixed(2)}</div>
+              <div className="font-mono">{order.price.toFixed(2)} USDT</div>
             </div>
             <div>
               <div className="text-gray-500 dark:text-gray-400">Total</div>
               <div className="font-mono">
-                {(order.price * order.quantity).toFixed(2)}
+                {(order.price * order.quantity).toFixed(2)} USDT
               </div>
             </div>
           </div>
@@ -84,4 +84,4 @@ export const OpenOrdersTab = () => {
       ))}
     </div>
   )
-}
+})
