@@ -7,7 +7,8 @@
     "format": "biome format --write .",
     "prepare": "husky",
     "type-check": "turbo run type-check",
-    "lighthouse": "turbo run lighthouse"
+    "lighthouse": "turbo run lighthouse",
+    "test:e2e": "pnpm test:e2e"
   },
   "devDependencies": {
     "@biomejs/biome": "2.3.0",

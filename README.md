@@ -30,3 +30,14 @@ This Turborepo has some additional tools already setup for you:
 - [TypeScript](https://www.typescriptlang.org/) for static type checking
 - [ESLint](https://eslint.org/) for code linting
 - [Prettier](https://prettier.io) for code formatting
+- [Playwright](https://playwright.dev/) for end-to-end testing
+
+## Running E2E Tests
+
+The project includes Playwright tests to verify the complete order flow. To run the tests:
+
+```bash
+pnpm test:e2e
+```
+
+The tests verify that orders submitted through the Trade Ticket form appear correctly in the Positions Widget's Open Orders tab.

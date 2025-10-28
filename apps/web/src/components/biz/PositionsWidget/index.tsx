@@ -123,6 +123,7 @@ export const PositionsWidget = memo(() => {
       {/* Tab Navigation */}
       <div className="flex space-x-1 mb-4 bg-gray-100 dark:bg-gray-800 rounded-lg p-1">
         <button
+          data-testid="tab-positions"
           onClick={() => setActiveTab('positions')}
           className={cn(
             'flex-1 py-2 px-3 rounded-md text-sm font-medium transition-colors cursor-pointer',
@@ -134,6 +135,7 @@ export const PositionsWidget = memo(() => {
           Positions
         </button>
         <button
+          data-testid="tab-open-orders"
           onClick={() => setActiveTab('orders')}
           className={cn(
             'flex-1 py-2 px-3 rounded-md text-sm font-medium transition-colors cursor-pointer',

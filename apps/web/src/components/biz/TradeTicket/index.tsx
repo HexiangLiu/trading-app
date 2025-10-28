@@ -195,6 +195,7 @@ export const TradeTicket = memo(() => {
           <div className="flex space-x-2">
             <button
               type="button"
+              data-testid="side-buy"
               onClick={() => handleSideChange(OrderSide.BUY)}
               className={cn(
                 'flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors cursor-pointer',
@@ -207,6 +208,7 @@ export const TradeTicket = memo(() => {
             </button>
             <button
               type="button"
+              data-testid="side-sell"
               onClick={() => handleSideChange(OrderSide.SELL)}
               className={cn(
                 'flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors cursor-pointer',
@@ -282,6 +284,7 @@ export const TradeTicket = memo(() => {
         {/* Submit Button */}
         <button
           type="submit"
+          data-testid="submit-order"
           disabled={isSubmitting}
           className={cn(
             'w-full py-2 px-4 rounded-md text-sm font-medium transition-colors cursor-pointer',

@@ -16,7 +16,7 @@ export const PositionsTab = memo(() => {
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4" data-testid="positions-tab-content">
       {/* PnL Summary */}
       <div className="grid grid-cols-2 gap-4">
         <div className="bg-white dark:bg-gray-800 rounded-lg p-4 border border-gray-200 dark:border-gray-700">
@@ -54,10 +54,11 @@ export const PositionsTab = memo(() => {
       </div>
 
       {/* Positions List */}
-      <div className="space-y-3">
+      <div className="space-y-3" data-testid="positions-list">
         {pnlData.positions.map((position, index) => (
           <div
             key={`${position.symbol}-${position.exchange}-${index}`}
+            data-testid="position-item"
             className="border border-gray-200 dark:border-gray-600 rounded-lg p-3"
           >
             <div className="flex items-center justify-between mb-2">

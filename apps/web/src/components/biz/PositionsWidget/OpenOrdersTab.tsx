@@ -21,10 +21,11 @@ export const OpenOrdersTab = memo(() => {
   }
 
   return (
-    <div className="space-y-2">
+    <div className="space-y-2" data-testid="open-orders-list">
       {openOrders.map(order => (
         <div
           key={order.id}
+          data-testid="order-item"
           className="border border-gray-200 dark:border-gray-600 rounded-lg p-3"
         >
           <div className="flex items-center justify-between mb-2">
@@ -33,6 +34,7 @@ export const OpenOrdersTab = memo(() => {
                 {order.symbol}
               </span>
               <span
+                data-testid="order-side"
                 className={cn(
                   'px-2 py-1 rounded text-xs font-medium',
                   order.side === 'BUY'
@@ -42,11 +44,15 @@ export const OpenOrdersTab = memo(() => {
               >
                 {order.side}
               </span>
-              <span className="px-2 py-1 rounded text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
+              <span
+                data-testid="order-type"
+                className="px-2 py-1 rounded text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200"
+              >
                 {order.type}
               </span>
             </div>
             <span
+              data-testid="order-status"
               className={cn(
                 'px-2 py-1 rounded text-xs font-medium',
                 order.status === OrderStatus.PENDING
@@ -60,11 +66,15 @@ export const OpenOrdersTab = memo(() => {
           <div className="grid grid-cols-3 gap-4 text-xs sm:text-sm">
             <div>
               <div className="text-gray-500 dark:text-gray-400">Quantity</div>
-              <div className="font-mono">{order.quantity.toFixed(4)}</div>
+              <div data-testid="order-quantity" className="font-mono">
+                {order.quantity.toFixed(4)}
+              </div>
             </div>
             <div>
               <div className="text-gray-500 dark:text-gray-400">Price</div>
-              <div className="font-mono">{order.price.toFixed(2)} USDT</div>
+              <div data-testid="order-price" className="font-mono">
+                {order.price.toFixed(2)} USDT
+              </div>
             </div>
             <div>
               <div className="text-gray-500 dark:text-gray-400">Total</div>
