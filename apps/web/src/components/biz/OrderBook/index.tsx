@@ -6,8 +6,8 @@ import { instrumentAtom } from '@/store/instrument'
 import { InstrumentName } from '@/types/instrument'
 import type { OrderBookData, ProcessedOrderBook } from '@/types/orderbook'
 import { throttle } from '@/utils/throttle'
+import { processOrderBookData } from '../../../utils/processData'
 import { OrderBookRow } from './Row'
-import { processOrderBookData } from './utils/processData'
 
 const TICK_SIZE_MAP = {
   [InstrumentName.BTCUSDT]: 0.01,

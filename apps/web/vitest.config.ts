@@ -21,7 +21,10 @@ export default defineConfig({
         'src/main.tsx',
         'src/vite-env.d.ts',
         'src/charting_library/**',
-        'src/components/biz/TradingViewChart/**'
+        'src/components/biz/**',
+        'src/types/**',
+        'src/pages/**',
+        'src/workers/tradeAggregator.ts'
       ]
     }
   },

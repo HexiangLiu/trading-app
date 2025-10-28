@@ -10,7 +10,7 @@ import type { OrderFormData } from '@/types/order'
 import { OrderSide, OrderStatus } from '@/types/order'
 import { cn } from '@/utils/classMerge'
 import { sanitizeInput } from '@/utils/sanitize'
-import { validateOrder } from './utils/validation'
+import { validateOrder } from '../../../utils/validation'
 
 export const TradeTicket = memo(() => {
   const instrument = useAtomValue(instrumentAtom)
