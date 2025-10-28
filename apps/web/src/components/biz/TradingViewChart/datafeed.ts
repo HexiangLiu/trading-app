@@ -29,10 +29,6 @@ export interface Bar {
 }
 
 export class Datafeed implements IBasicDataFeed {
-  constructor() {
-    // 不需要任何配置，单实例
-  }
-
   /**
    * TradingView Datafeed接口实现
    */
@@ -219,3 +215,5 @@ export class Datafeed implements IBasicDataFeed {
 
   unsubscribeBars(_subscribeUID: string): void {}
 }
+
+export const datafeed = new Datafeed()

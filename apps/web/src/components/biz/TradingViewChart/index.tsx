@@ -98,6 +98,8 @@ export const TradingViewChart = memo(() => {
 
       return () => {
         tvWidget.remove()
+        setChartLoaded(false)
+        widgetRef.current = null
       }
     } catch (error) {
       console.error('Failed to initialize TradingView chart:', error)

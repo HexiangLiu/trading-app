@@ -1,5 +1,13 @@
 import { useAtom } from 'jotai'
-import { memo, useCallback, useEffect, useMemo, useState } from 'react'
+import {
+  lazy,
+  memo,
+  Suspense,
+  useCallback,
+  useEffect,
+  useMemo,
+  useState
+} from 'react'
 import {
   type Layout,
   type Layouts,
@@ -10,10 +18,15 @@ import { InstrumentSelector } from '@/components/biz/InstrumentSelector'
 import { OrderBook } from '@/components/biz/OrderBook'
 import { PositionsWidget } from '@/components/biz/PositionsWidget'
 import { TradeTicket } from '@/components/biz/TradeTicket'
-import { TradingViewChart } from '@/components/biz/TradingViewChart'
 import { layoutAtom } from '@/store/layout'
 import { throttle } from '@/utils/throttle'
 import 'react-grid-layout/css/styles.css'
+
+const TradingViewChart = lazy(() =>
+  import('@/components/biz/TradingViewChart').then(module => ({
+    default: module.TradingViewChart
+  }))
+)
 
 const ResponsiveGridLayout = WidthProvider(Responsive)
 
@@ -95,7 +108,15 @@ export const Content = memo(() => {
         className="relative bg-gray-200 dark:bg-neutral-900 rounded-lg shadow-md border border-gray-200 dark:border-gray-700"
       >
         <DragHandle />
-        <TradingViewChart />
+        <Suspense
+          fallback={
+            <div className="w-full h-full bg-neutral-900 flex items-center justify-center">
+              <div className="w-12 h-12 border-4 border-gray-700 border-t-blue-500 rounded-full animate-spin" />
+            </div>
+          }
+        >
+          <TradingViewChart />
+        </Suspense>
       </div>
 
       <div
