@@ -16,6 +16,8 @@
     "lint": {},
     "lighthouse": {},
     "type-check": {},
+    "test": {},
+    "test:e2e": {},
     "dev": {
       "cache": false,
       "persistent": true
