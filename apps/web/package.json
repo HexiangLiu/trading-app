@@ -10,7 +10,8 @@
     "lint": "biome lint --max-diagnostics=1000 --colors=force --write --diagnostic-level=error",
     "type-check": "tsc --noEmit",
     "lighthouse": "pnpm build && npx lhci autorun --config=./lighthouserc.json",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "test:e2e:install": "playwright install --with-deps"
   },
   "dependencies": {
     "@radix-ui/react-dropdown-menu": "^2.1.16",
