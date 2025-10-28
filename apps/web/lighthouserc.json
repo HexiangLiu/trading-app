@@ -1,0 +1,28 @@
+{
+    "ci": {
+        "collect": {
+            "staticDistDir": "./dist",
+            "url": [
+                "http://localhost/index.html"
+            ],
+            "numberOfRuns": 3,
+            "settings": {
+                "throttling": {
+                    "cpuSlowdownMultiplier": 4,
+                    "rttMs": 150,
+                    "throughputKbps": 1638.4
+                }
+            }
+        },
+        "assert": {
+            "assertions": {
+                "first-contentful-paint": [
+                    "error",
+                    {
+                        "maxNumericValue": 1500
+                    }
+                ]
+            }
+        }
+    }
+}

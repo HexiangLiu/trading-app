@@ -9,3 +9,13 @@ dist-ssr
 .cache
 server/dist
 public/dist
+.lighthouseci
+
+# Playwright
+test-results/
+playwright-report/
+playwright/.cache/
+
+# Vitest
+coverage/
+
