@@ -21,8 +21,10 @@ import { TradeTicket } from '@/components/biz/TradeTicket'
 import { layoutAtom } from '@/store/layout'
 import { throttle } from '@/utils/throttle'
 import 'react-grid-layout/css/styles.css'
+import { ChartSkeleton } from '@/components/biz/TradingViewChart/ChartSkeleton'
 
-const TradingViewChart = lazy(() =>
+// Lazily import TradingViewChart, but only mount after browser is idle (or after fallback timeout)
+const TradingViewChartLazy = lazy(() =>
   import('@/components/biz/TradingViewChart').then(module => ({
     default: module.TradingViewChart
   }))
@@ -37,6 +39,7 @@ const DragHandle = () => (
 export const Content = memo(() => {
   const [layouts, setLayouts] = useAtom(layoutAtom)
   const [isLargeScreen, setIsLargeScreen] = useState(false)
+  const [chartReady, setChartReady] = useState(false)
 
   useEffect(() => {
     const checkScreenSize = throttle(() => {
@@ -45,6 +48,14 @@ export const Content = memo(() => {
     checkScreenSize()
     window.addEventListener('resize', checkScreenSize)
     return () => window.removeEventListener('resize', checkScreenSize)
+  }, [])
+
+  // Manually defer TradingView mount to avoid blocking FCP/LCP
+  useEffect(() => {
+    const loadTimer = requestIdleCallback(() => setChartReady(true), {
+      timeout: 1000
+    })
+    return () => cancelIdleCallback(loadTimer)
   }, [])
 
   const handleLayoutChange = useCallback(
@@ -108,15 +119,13 @@ export const Content = memo(() => {
         className="relative bg-gray-200 dark:bg-neutral-900 rounded-lg shadow-md border border-gray-200 dark:border-gray-700"
       >
         <DragHandle />
-        <Suspense
-          fallback={
-            <div className="w-full h-full bg-neutral-900 flex items-center justify-center">
-              <div className="w-12 h-12 border-4 border-gray-700 border-t-blue-500 rounded-full animate-spin" />
-            </div>
-          }
-        >
-          <TradingViewChart />
-        </Suspense>
+        {chartReady ? (
+          <Suspense fallback={<ChartSkeleton />}>
+            <TradingViewChartLazy />
+          </Suspense>
+        ) : (
+          <ChartSkeleton />
+        )}
       </div>
 
       <div

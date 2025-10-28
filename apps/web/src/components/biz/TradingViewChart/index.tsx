@@ -8,6 +8,8 @@ import {
 } from '@/charting_library'
 import { DEFAULT_INSTRUMENT, instrumentAtom } from '@/store/instrument'
 import type { Instrument } from '@/types/instrument'
+import { cn } from '@/utils/classMerge'
+import { ChartSkeleton } from './ChartSkeleton'
 import { Datafeed } from './datafeed'
 
 const datafeed = new Datafeed()
@@ -107,5 +109,13 @@ export const TradingViewChart = memo(() => {
     }
   }, [])
 
-  return <div ref={chartContainerRef} className="w-full h-full" />
+  return (
+    <>
+      {!chartLoaded && <ChartSkeleton />}
+      <div
+        ref={chartContainerRef}
+        className={cn('w-full h-full', chartLoaded ? 'block' : 'hidden')}
+      />
+    </>
+  )
 })
