@@ -17,16 +17,16 @@ const datafeed = new Datafeed()
 export const TradingViewChart = memo(() => {
   const chartContainerRef = useRef<HTMLDivElement>(null)
   const widgetRef = useRef<IChartingLibraryWidget>(null)
-  const prevInstrumentRef = useRef<Instrument>(DEFAULT_INSTRUMENT)
-  const currentIntervalRef = useRef<string>('4h')
+  const currentInstrumentRef = useRef<Instrument>(DEFAULT_INSTRUMENT)
+  const currentIntervalRef = useRef<string>('240')
   const [instrument] = useAtom(instrumentAtom)
   const [chartLoaded, setChartLoaded] = useState<boolean>(false)
 
   const handleSwitchInstrument = useCallback(async (instrument: Instrument) => {
-    if (prevInstrumentRef.current === instrument) return
+    if (currentInstrumentRef.current === instrument) return
 
-    const oldInstrument = prevInstrumentRef.current
-    prevInstrumentRef.current = instrument
+    const oldInstrument = currentInstrumentRef.current
+    currentInstrumentRef.current = instrument
 
     // Unsubscribe from old instrument kline streams only
     if (oldInstrument) {
@@ -38,6 +38,7 @@ export const TradingViewChart = memo(() => {
         currentIntervalRef.current
       )
     }
+    console.log('Switch instrument:', instrument)
     widgetRef.current
       ?.chart()
       .setSymbol(`${instrument.exchange}:${instrument.name.toUpperCase()}`)
@@ -48,30 +49,12 @@ export const TradingViewChart = memo(() => {
   }, [instrument, handleSwitchInstrument])
 
   useEffect(() => {
-    if (chartLoaded) {
-      widgetRef.current
-        ?.chart()
-        .onIntervalChanged()
-        .subscribe(null, interval => {
-          // Unsubscribe from current kline stream
-          currentIntervalRef.current = interval
-          exchangeAdapterManager.unsubscribe(
-            instrument.exchange,
-            instrument.name,
-            'kline',
-            interval
-          )
-        })
-    }
-  }, [chartLoaded, instrument])
-
-  useEffect(() => {
     if (!chartContainerRef.current) return
 
     try {
       const tvWidget = new widget({
         container: chartContainerRef.current,
-        interval: '4h' as ResolutionString,
+        interval: '240' as ResolutionString,
         datafeed,
         locale: 'en',
         library_path: '/charting_library/',
@@ -87,18 +70,40 @@ export const TradingViewChart = memo(() => {
           'timeframes_toolbar'
         ]
       })
+      // Reset current instrument and interval for HMR
+      currentInstrumentRef.current = DEFAULT_INSTRUMENT
+      currentIntervalRef.current = '240'
       widgetRef.current = tvWidget
 
       // Listen for chart ready event
       tvWidget.onChartReady(() => {
         setChartLoaded(true)
         const chart = tvWidget.chart()
+        chart.onIntervalChanged().subscribe(null, interval => {
+          console.log('onIntervalChanged', interval, currentIntervalRef.current)
+          exchangeAdapterManager.unsubscribe(
+            currentInstrumentRef.current.exchange,
+            currentInstrumentRef.current.name,
+            'kline',
+            currentIntervalRef.current
+          )
+          currentIntervalRef.current = interval
+        })
         chart.createStudy('Moving Average Exponential', false, false, {
           length: 9
         })
       })
 
       return () => {
+        // Unsubscribe from current kline stream before removing widgets
+        if (currentInstrumentRef.current) {
+          exchangeAdapterManager.unsubscribe(
+            currentInstrumentRef.current.exchange,
+            currentInstrumentRef.current.name,
+            'kline',
+            currentIntervalRef.current
+          )
+        }
         tvWidget.remove()
         setChartLoaded(false)
         widgetRef.current = null

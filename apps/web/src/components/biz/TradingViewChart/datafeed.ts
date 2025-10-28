@@ -17,6 +17,7 @@ import type {
   SearchSymbolsCallback,
   SubscribeBarsCallback
 } from '@/charting_library'
+import type { Exchange } from '@/types/instrument'
 
 export interface Bar {
   time: number
@@ -78,16 +79,14 @@ export class Datafeed implements IBasicDataFeed {
       let ticker = symbolName
       let exchange = 'Binance'
 
-      if (symbolName.includes(':')) {
-        const parts = symbolName.split(':')
-        exchange = parts[0]
-        ticker = parts[1]
-      }
+      const parts = symbolName.split(':')
+      exchange = parts[0]
+      ticker = parts[1]
 
       const symbolInfo: LibrarySymbolInfo = {
-        name: ticker,
-        ticker: ticker,
-        description: `${ticker} / USDT`,
+        name: `${exchange}:${ticker}`,
+        ticker: `${exchange}:${ticker}`,
+        description: `${ticker} / USDT (${exchange})`,
         type: 'crypto',
         session: '24x7',
         timezone: 'Etc/UTC',
@@ -109,6 +108,7 @@ export class Datafeed implements IBasicDataFeed {
         volume_precision: 8,
         data_status: 'streaming'
       }
+      console.log('resolve symbol:', symbolInfo)
       onResolve(symbolInfo)
     } catch (error) {
       console.error('Error resolving symbol:', error)
@@ -125,8 +125,14 @@ export class Datafeed implements IBasicDataFeed {
   ): void {
     try {
       // 从 symbolInfo 中获取 instrument 信息
-      const symbol = symbolInfo.ticker || 'BTCUSDT'
-      const exchange = symbolInfo.exchange || 'Binance'
+      let symbol = symbolInfo.ticker || 'BTCUSDT'
+      let exchange = symbolInfo.exchange || 'Binance'
+
+      const parts = symbol.split(':')
+      exchange = parts[0]
+      symbol = parts[1]
+
+      console.log('fetch historical bars:', symbol, exchange, resolution)
 
       const startTime = periodParams.from * 1000
       const endTime = periodParams.to * 1000
@@ -183,34 +189,24 @@ export class Datafeed implements IBasicDataFeed {
     subscribeUID: string,
     _onResetCacheNeededCallback: () => void
   ): void {
-    console.log('Subscribe bars:', subscribeUID)
+    let symbol = _symbolInfo.ticker || 'BTCUSDT'
+    let exchange = _symbolInfo.exchange || 'Binance'
 
-    // 从 symbolInfo 中获取 instrument 信息
-    const symbol = _symbolInfo.ticker || 'BTCUSDT'
-    const exchange = _symbolInfo.exchange || 'Binance'
+    const parts = symbol.split(':')
+    exchange = parts[0]
+    symbol = parts[1]
+
+    console.log('Subscribe bars:', subscribeUID, symbol, exchange, resolution)
 
     // Import exchangeAdapterManager here to avoid circular dependency
     import('@/adapters').then(({ exchangeAdapterManager }) => {
-      exchangeAdapterManager.subscribe(exchange as any, {
+      exchangeAdapterManager.subscribe(exchange as Exchange, {
         symbol: symbol,
         streamType: 'kline',
-        interval: this.mapResolutionToInterval(resolution),
+        interval: resolution,
         callback: onRealtimeCallback
       })
     })
-  }
-
-  private mapResolutionToInterval(resolution: ResolutionString): string {
-    const intervalMap: Record<string, string> = {
-      '1': '1m',
-      '5': '5m',
-      '15': '15m',
-      '30': '30m',
-      '60': '1h',
-      '240': '4h',
-      '1D': '1d'
-    }
-    return intervalMap[resolution] || '1m'
   }
 
   unsubscribeBars(_subscribeUID: string): void {}

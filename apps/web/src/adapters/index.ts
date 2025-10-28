@@ -16,8 +16,6 @@ export interface StreamSubscription {
 export interface ExchangeAdapter {
   // Connection management
   connect(): Promise<void>
-  getConnectionStatus(): boolean
-
   // Dynamic subscription management
   subscribe(subscription: StreamSubscription): void
   unsubscribe(
@@ -27,7 +25,6 @@ export interface ExchangeAdapter {
     callback?: (data: any) => void
   ): void
   unsubscribeAll(symbol: string): void
-
   // Historical data
   getHistoricalBars(
     symbol: string,
@@ -36,16 +33,13 @@ export interface ExchangeAdapter {
     endTime: number,
     limit?: number
   ): Promise<any[]>
-
-  // Utility methods
-  getActiveStreams(): string[]
   getExchange(): string
 }
 export class ExchangeAdapterManager {
   private adapters = new Map<Exchange, ExchangeAdapter>()
 
   constructor() {
-    // Initialize with default adapter
+    // Initialize with default adapters
     this.adapters.set(Exchange.BINANCE, binanceAdapter)
   }
 
@@ -111,14 +105,6 @@ export class ExchangeAdapterManager {
     if (adapter) {
       adapter.unsubscribeAll(symbol)
     }
-  }
-
-  /**
-   * Get connection status for specific exchange
-   */
-  getConnectionStatus(exchange: Exchange): boolean {
-    const adapter = this.adapters.get(exchange)
-    return adapter?.getConnectionStatus() ?? false
   }
 
   /**

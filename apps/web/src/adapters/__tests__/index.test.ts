@@ -20,12 +20,10 @@ describe('ExchangeAdapterManager', () => {
 
     // Setup mock methods
     vi.mocked(mockBinanceAdapter.connect).mockResolvedValue(undefined)
-    vi.mocked(mockBinanceAdapter.getConnectionStatus).mockReturnValue(true)
     vi.mocked(mockBinanceAdapter.subscribe).mockImplementation(() => {})
     vi.mocked(mockBinanceAdapter.unsubscribe).mockImplementation(() => {})
     vi.mocked(mockBinanceAdapter.unsubscribeAll).mockImplementation(() => {})
     vi.mocked(mockBinanceAdapter.getHistoricalBars).mockResolvedValue([])
-    vi.mocked(mockBinanceAdapter.getActiveStreams).mockReturnValue([])
     vi.mocked(mockBinanceAdapter.getExchange).mockReturnValue('BINANCE')
 
     // Clear window singleton
@@ -143,20 +141,6 @@ describe('ExchangeAdapterManager', () => {
       expect(() => {
         manager.unsubscribeAll(unknownExchange, 'BTCUSDT')
       }).not.toThrow()
-    })
-  })
-
-  describe('getConnectionStatus', () => {
-    it('should return connection status when adapter exists', () => {
-      const status = manager.getConnectionStatus(Exchange.BINANCE)
-      expect(status).toBe(true)
-      expect(mockBinanceAdapter.getConnectionStatus).toHaveBeenCalled()
-    })
-
-    it('should return false when adapter does not exist', () => {
-      const unknownExchange = 'UNKNOWN' as Exchange
-      const status = manager.getConnectionStatus(unknownExchange)
-      expect(status).toBe(false)
     })
   })
 

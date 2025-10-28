@@ -206,10 +206,6 @@ export class BinanceAdapter implements ExchangeAdapter {
     }
   }
 
-  getActiveStreams(): string[] {
-    return Array.from(this.activeStreams)
-  }
-
   getExchange(): string {
     return 'BINANCE'
   }
@@ -629,13 +625,6 @@ export class BinanceAdapter implements ExchangeAdapter {
           this.handleReconnect()
         })
     }, delay)
-  }
-
-  /**
-   * Get connection status
-   */
-  getConnectionStatus(): boolean {
-    return this.isConnected && this.ws?.readyState === WebSocket.OPEN
   }
 
   /**
