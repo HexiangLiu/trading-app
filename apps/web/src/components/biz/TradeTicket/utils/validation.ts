@@ -1,4 +1,5 @@
 import type { OrderFormData, OrderValidation } from '@/types/order'
+import { OrderSide } from '@/types/order'
 import type { Position } from '@/workers/tradeAggregator'
 
 /**
@@ -28,10 +29,10 @@ export const validateOrder = (
 
   // Validate post-only orders
   if (formData.postOnly) {
-    if (formData.side === 'BUY' && price >= bestAsk) {
+    if (formData.side === OrderSide.BUY && price >= bestAsk) {
       errors.push('Buy post-only orders must be below the best ask')
     }
-    if (formData.side === 'SELL' && price <= bestBid) {
+    if (formData.side === OrderSide.SELL && price <= bestBid) {
       errors.push('Sell post-only orders must be above the best bid')
     }
   }
@@ -59,7 +60,11 @@ export const validateOrder = (
   }
 
   // Validate sell orders against available position
-  if (formData.side === 'SELL' && !Number.isNaN(quantity) && quantity > 0) {
+  if (
+    formData.side === OrderSide.SELL &&
+    !Number.isNaN(quantity) &&
+    quantity > 0
+  ) {
     if (symbol && exchange) {
       // Find matching position for this specific symbol and exchange
       const matchingPosition = positions.find(

@@ -10,6 +10,9 @@
     "lint": "biome lint --max-diagnostics=1000 --colors=force --write --diagnostic-level=error",
     "type-check": "tsc --noEmit",
     "lighthouse": "pnpm build && npx lhci autorun --config=./lighthouserc.json",
+    "test": "vitest",
+    "test:ui": "vitest --ui",
+    "test:coverage": "vitest run --coverage",
     "test:e2e": "playwright test",
     "test:e2e:install": "playwright install --with-deps"
   },
@@ -30,11 +33,17 @@
     "@lhci/cli": "^0.12.0",
     "@playwright/test": "^1.56.1",
     "@repo/typescript-config": "workspace:*",
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.0",
+    "@testing-library/user-event": "^14.6.1",
     "@types/react": "^19.0.1",
     "@types/react-dom": "^19.0.2",
     "@types/react-grid-layout": "^1.3.5",
     "@vitejs/plugin-react": "^3.1.0",
+    "@vitest/coverage-v8": "^4.0.4",
+    "jsdom": "22",
     "typescript": "5.5.4",
-    "vite": "^5.1.4"
+    "vite": "^5.1.4",
+    "vitest": "^4.0.4"
   }
 }
