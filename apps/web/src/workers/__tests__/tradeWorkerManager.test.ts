@@ -196,6 +196,44 @@ describe('TradeWorkerManager', () => {
       ])
     })
 
+    it('should handle PNL_UPDATE messages', () => {
+      const handler = vi.fn()
+      manager.onMessage('PNL_UPDATE', handler)
+
+      const worker = (manager as any).worker as MockWorker
+      const mockPnLData = {
+        positions: [],
+        totalUnrealizedPnL: 0,
+        totalRealizedPnL: 0
+      }
+
+      worker.simulateMessage({
+        type: 'PNL_UPDATE',
+        data: mockPnLData
+      })
+
+      expect(handler).toHaveBeenCalledWith(mockPnLData)
+    })
+
+    it('should handle POSITION_CLOSED messages', () => {
+      const handler = vi.fn()
+      manager.onMessage('POSITION_CLOSED', handler)
+
+      const worker = (manager as any).worker as MockWorker
+      const mockClosedData = {
+        symbol: 'binance:BTCUSDT',
+        closedOrders: [],
+        realizedPnL: 100
+      }
+
+      worker.simulateMessage({
+        type: 'POSITION_CLOSED',
+        data: mockClosedData
+      })
+
+      expect(handler).toHaveBeenCalledWith(mockClosedData)
+    })
+
     it('should unregister message handler', () => {
       const handler = vi.fn()
       manager.onMessage('AGGREGATED_PRICES', handler)

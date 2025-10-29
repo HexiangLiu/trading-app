@@ -48,7 +48,13 @@ interface PnLData {
 }
 
 interface WorkerMessage {
-  type: 'TRADE_DATA' | 'SUBSCRIBE' | 'UNSUBSCRIBE' | 'ORDERS_UPDATE'
+  type:
+    | 'TRADE_DATA'
+    | 'SUBSCRIBE'
+    | 'UNSUBSCRIBE'
+    | 'ORDERS_UPDATE'
+    | 'PNL_UPDATE'
+    | 'POSITION_CLOSED'
   data?: any
 }
 
@@ -208,30 +214,34 @@ function calculatePnL(): PnLData {
   }
 }
 
-// Update positions based on filled orders
+// Update positions based on filled orders with Active/Closed distinction
 function updatePositions(orders: Order[]) {
   // Group filled orders by symbol
   const filledOrdersBySymbol = new Map<string, Order[]>()
+  const filledOrders = orders.filter(order => order.status === 'FILLED')
 
-  orders
-    .filter(order => order.status === 'FILLED')
-    .forEach(order => {
-      const key = `${order.exchange}:${order.symbol}`
-      if (!filledOrdersBySymbol.has(key)) {
-        filledOrdersBySymbol.set(key, [])
-      }
-      const orders = filledOrdersBySymbol.get(key)
-      if (orders) {
-        orders.push(order)
-      }
-    })
+  filledOrders.forEach(order => {
+    const key = `${order.exchange}:${order.symbol}`
+    if (!filledOrdersBySymbol.has(key)) {
+      filledOrdersBySymbol.set(key, [])
+    }
+    const orders = filledOrdersBySymbol.get(key)
+    if (orders) {
+      orders.push(order)
+    }
+  })
 
-  // Calculate positions for each symbol
+  // Track which positions are still active after processing
+  const activePositionKeys = new Set<string>()
+
+  // Calculate positions for each symbol with Active/Closed logic
   filledOrdersBySymbol.forEach((orders, key) => {
     const [exchange, symbol] = key.split(':')
-    let totalQuantity = 0
-    let totalValue = 0
-    let realizedPnL = 0
+    let positionQty = 0 // Net quantity (positive = long, negative = short)
+    let positionCost = 0 // Total cost basis
+    let realizedPnL = 0 // Accumulated realized PnL
+    let activeOrders: Order[] = [] // Orders that contribute to current position
+    const closedOrders: Order[] = [] // Orders that have been fully offset
 
     // Process orders chronologically
     const sortedOrders = orders.sort((a, b) => a.timestamp - b.timestamp)
@@ -241,46 +251,83 @@ function updatePositions(orders: Order[]) {
       const price = order.price
 
       if (order.side === 'BUY') {
-        // Add to position
-        totalQuantity += quantity
-        totalValue += quantity * price
+        // Buy order: increase position
+        positionQty += quantity
+        positionCost += quantity * price
+        activeOrders.push(order)
       } else if (order.side === 'SELL') {
-        if (totalQuantity > 0) {
-          // Calculate realized PnL for the sold portion
-          const sellQuantity = Math.min(quantity, totalQuantity)
-          const avgCost = totalValue / totalQuantity
-          const realizedGain = (price - avgCost) * sellQuantity
+        if (positionQty > 0) {
+          // Sell with existing position: partial or full close
+          const offsetQty = Math.min(quantity, positionQty)
+          const avgCost = positionCost / positionQty
+
+          // Calculate realized PnL: sell price - cost price
+          const realizedGain = (price - avgCost) * offsetQty
           realizedPnL += realizedGain
 
           // Reduce position
-          totalQuantity -= sellQuantity
-          totalValue -= sellQuantity * avgCost
+          positionQty -= offsetQty
+          positionCost -= avgCost * offsetQty
+
+          // If fully closed, mark related orders as closed
+          if (positionQty === 0) {
+            closedOrders.push(...activeOrders)
+            activeOrders = []
+          }
+
+          // Note: oversold should not create short position
+          // In normal trading, sell quantity cannot exceed position quantity
+          const remainSell = quantity - offsetQty
+          if (remainSell > 0) {
+            console.warn(
+              `Oversold detected for ${key}, remainSell: ${remainSell}, this should not happen in normal trading`
+            )
+            // Do not create short position, only log warning
+          }
+        } else if (positionQty <= 0) {
+          // Sell without position: should be rejected in normal trading
+          console.warn(
+            `Sell order without position for ${key}, this should not happen in normal trading`
+          )
+          // Do not process this order, or can choose to reject
         }
       }
     }
 
     // Update or create position
-    if (totalQuantity > 0) {
-      const averagePrice = totalValue / totalQuantity
+    if (positionQty !== 0) {
+      const averagePrice = positionCost / Math.abs(positionQty)
       positions.set(key, {
         symbol,
         exchange,
-        quantity: totalQuantity,
+        quantity: positionQty,
         averagePrice,
         unrealizedPnL: 0, // Will be calculated in calculatePnL
         realizedPnL,
         lastUpdate: Date.now()
       })
+      activePositionKeys.add(key)
     } else {
-      // Remove position if fully closed
+      // Position closed, remove position
       positions.delete(key)
+    }
+
+    // Send closed orders event if needed
+    if (closedOrders.length > 0) {
+      self.postMessage({
+        type: 'POSITION_CLOSED',
+        data: {
+          symbol: key,
+          closedOrders,
+          realizedPnL
+        }
+      })
     }
   })
 
-  // Remove positions for symbols that no longer have filled orders
-  const activeSymbols = new Set(filledOrdersBySymbol.keys())
+  // Remove positions that no longer have active orders
   for (const [key] of positions) {
-    if (!activeSymbols.has(key)) {
+    if (!activePositionKeys.has(key)) {
       positions.delete(key)
     }
   }
