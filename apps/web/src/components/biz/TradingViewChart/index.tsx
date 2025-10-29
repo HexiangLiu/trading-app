@@ -1,16 +1,29 @@
-import { useAtom } from 'jotai'
-import { memo, useCallback, useEffect, useRef, useState } from 'react'
+import { useAtom, useAtomValue } from 'jotai'
+import {
+  lazy,
+  memo,
+  Suspense,
+  useCallback,
+  useEffect,
+  useRef,
+  useState
+} from 'react'
 import { exchangeAdapterManager } from '@/adapters'
 import {
   type IChartingLibraryWidget,
   type ResolutionString,
   widget
 } from '@/charting_library'
+import { ChartTab, chartTabAtom } from '@/store/chart'
 import { DEFAULT_INSTRUMENT, instrumentAtom } from '@/store/instrument'
 import type { Instrument } from '@/types/instrument'
 import { cn } from '@/utils/classMerge'
 import { ChartSkeleton } from './ChartSkeleton'
 import { Datafeed } from './datafeed'
+
+const DepthChart = lazy(() =>
+  import('./DepthChart').then(module => ({ default: module.DepthChart }))
+)
 
 const datafeed = new Datafeed()
 
@@ -21,6 +34,7 @@ export const TradingViewChart = memo(() => {
   const currentIntervalRef = useRef<string>('240')
   const [instrument] = useAtom(instrumentAtom)
   const [chartLoaded, setChartLoaded] = useState<boolean>(false)
+  const chartTab = useAtomValue(chartTabAtom)
 
   const handleSwitchInstrument = useCallback(async (instrument: Instrument) => {
     if (currentInstrumentRef.current === instrument) return
@@ -119,8 +133,15 @@ export const TradingViewChart = memo(() => {
       {!chartLoaded && <ChartSkeleton />}
       <div
         ref={chartContainerRef}
-        className={cn('w-full h-full', chartLoaded ? 'block' : 'hidden')}
+        className={cn('w-full h-full block', {
+          hidden: !chartLoaded || chartTab === ChartTab.DEPTH
+        })}
       />
+      {chartTab === ChartTab.DEPTH && (
+        <Suspense fallback={<ChartSkeleton />}>
+          <DepthChart />
+        </Suspense>
+      )}
     </>
   )
 })
