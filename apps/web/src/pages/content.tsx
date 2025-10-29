@@ -116,7 +116,7 @@ export const Content = memo(() => {
 
       <div
         key="chart"
-        className="relative bg-gray-200 dark:bg-neutral-900 rounded-lg shadow-md border border-gray-200 dark:border-gray-700"
+        className="relative bg-gray-200 dark:bg-neutral-900 shadow-md"
       >
         <DragHandle />
         {chartReady ? (

@@ -73,7 +73,7 @@ describe('usePnL', () => {
     })
   })
 
-  it('should register PnL update message handler', async () => {
+  it('should register PnL update and position closed message handlers', async () => {
     const { getTradeWorkerManager } = await import(
       '@/workers/tradeWorkerManager'
     )
@@ -84,6 +84,10 @@ describe('usePnL', () => {
     await waitFor(() => {
       expect(workerManager.onMessage).toHaveBeenCalledWith(
         'PNL_UPDATE',
+        expect.any(Function)
+      )
+      expect(workerManager.onMessage).toHaveBeenCalledWith(
+        'POSITION_CLOSED',
         expect.any(Function)
       )
     })
@@ -132,7 +136,49 @@ describe('usePnL', () => {
     })
   })
 
-  it('should cleanup message handler on unmount', async () => {
+  it('should handle position closed events', async () => {
+    const { getTradeWorkerManager } = await import(
+      '@/workers/tradeWorkerManager'
+    )
+    const workerManager = getTradeWorkerManager()
+
+    renderHook(() => usePnL([]))
+
+    // Get the position closed handler
+    const handlerCall = (workerManager.onMessage as any).mock.calls.find(
+      (call: any[]) => call[0] === 'POSITION_CLOSED'
+    )
+    const handler = handlerCall?.[1]
+
+    expect(handler).toBeDefined()
+
+    // Simulate position closed event
+    const mockClosedOrders = [
+      {
+        id: 'order_1',
+        symbol: 'BTCUSDT',
+        exchange: 'binance',
+        side: OrderSide.BUY,
+        type: OrderType.LIMIT,
+        price: 50000,
+        quantity: 0.01,
+        postOnly: false,
+        status: OrderStatus.FILLED,
+        timestamp: Date.now()
+      }
+    ]
+
+    const payload = {
+      symbol: 'binance:BTCUSDT',
+      closedOrders: mockClosedOrders,
+      realizedPnL: 100
+    }
+
+    // The handler should not throw when called with a valid payload
+    expect(() => handler(payload)).not.toThrow()
+  })
+
+  it('should cleanup message handlers on unmount', async () => {
     const { getTradeWorkerManager } = await import(
       '@/workers/tradeWorkerManager'
     )
@@ -144,6 +190,7 @@ describe('usePnL', () => {
 
     await waitFor(() => {
       expect(workerManager.offMessage).toHaveBeenCalledWith('PNL_UPDATE')
+      expect(workerManager.offMessage).toHaveBeenCalledWith('POSITION_CLOSED')
     })
   })
 

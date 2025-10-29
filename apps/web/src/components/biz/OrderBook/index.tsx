@@ -10,7 +10,7 @@ import { processOrderBookData } from '../../../utils/processData'
 import { OrderBookRow } from './Row'
 
 const TICK_SIZE_MAP = {
-  [InstrumentName.BTCUSDT]: 0.01,
+  [InstrumentName.BTCUSDT]: 0.1,
   [InstrumentName.ETHUSDT]: 0.01,
   [InstrumentName.SOLUSDT]: 0.01
 }
@@ -66,7 +66,7 @@ export const OrderBook = memo(() => {
     () =>
       throttle((data: OrderBookData) => {
         processAndUpdateData(data, tickSize)
-      }, 200),
+      }, 500),
     [processAndUpdateData, tickSize]
   )
 

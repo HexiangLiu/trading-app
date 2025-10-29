@@ -1,5 +1,6 @@
 import { useAtomValue, useSetAtom } from 'jotai'
-import { useEffect } from 'react'
+import { useCallback, useEffect } from 'react'
+import { orderAtom } from '@/store/order'
 import { pnlAtom } from '@/store/pnl'
 import type { Order } from '@/types/order'
 import { getTradeWorkerManager } from '@/workers/tradeWorkerManager'
@@ -7,6 +8,7 @@ import { getTradeWorkerManager } from '@/workers/tradeWorkerManager'
 export function usePnL(orders: Order[]) {
   const pnlData = useAtomValue(pnlAtom)
   const setPnLData = useSetAtom(pnlAtom)
+  const setOrders = useSetAtom(orderAtom)
 
   // Update orders in Worker for PnL calculation
   useEffect(() => {
@@ -16,7 +18,26 @@ export function usePnL(orders: Order[]) {
     }
   }, [orders])
 
-  // Listen for PnL updates from Worker
+  // Remove closed orders from orderAtom
+  const removeClosedOrders = useCallback(
+    (closedOrders: Order[]) => {
+      try {
+        // Filter out closed orders from current orders
+        setOrders(currentOrders => {
+          const activeOrders = currentOrders.filter(
+            order => !closedOrders.some(closed => closed.id === order.id)
+          )
+
+          return activeOrders
+        })
+      } catch (error) {
+        console.error('Failed to remove closed orders from orderAtom:', error)
+      }
+    },
+    [setOrders]
+  )
+
+  // Listen for PnL updates and position closed events from Worker
   useEffect(() => {
     const workerManager = getTradeWorkerManager()
 
@@ -34,13 +55,21 @@ export function usePnL(orders: Order[]) {
       })
     }
 
-    // Register message handler
+    // Listen for position closed events
+    const handlePositionClosed = (data: any) => {
+      // Remove closed orders from orderAtom
+      removeClosedOrders(data.closedOrders)
+    }
+
+    // Register message handlers
     workerManager.onMessage('PNL_UPDATE', handlePnLUpdate)
+    workerManager.onMessage('POSITION_CLOSED', handlePositionClosed)
 
     return () => {
       workerManager.offMessage('PNL_UPDATE')
+      workerManager.offMessage('POSITION_CLOSED')
     }
-  }, [setPnLData])
+  }, [setPnLData, removeClosedOrders])
 
   return { pnlData }
 }
