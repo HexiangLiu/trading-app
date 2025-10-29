@@ -23,6 +23,7 @@ pnpm dev
 
 - **Real-time Trading Data**: WebSocket integration with Binance API for live market data
 - **Advanced Charting**: TradingView's lightweight charts library with custom datafeed
+- **Depth Chart**: Order book depth visualization (REST polling, rate-limit backoff, sticky axis)
 - **Order Management**: Create, submit, and track orders with full validation
 - **Position Tracking**: Real-time PnL calculation with position aggregation
 - **Responsive Layout**: Grid-based layout system with drag-and-drop resizing
@@ -33,34 +34,35 @@ pnpm dev
 
 ### Overview
 
-![Trading Application Architecture](./apps/web/public/architecture-diagram.png)
+![Trading Application Architecture](./architecture-diagram.png)
 
-这张架构图展示了交易应用的整体系统设计，包含以下几个主要层次：
+This diagram shows the overall system design with the following layers:
 
-**1. React UI 组件层**
-- **InstrumentSelector (交易对选择器)**: 负责选择交易对，与 `instrumentAtom` 进行读写操作
-- **TradingView Chart Datafeed**: 为图表提供数据，从 `ExchangeAdapterManager` 获取历史K线数据和订阅实时数据
-- **OrderBook local state**: 管理订单簿的本地数据，订阅最佳买卖价
-- **TradeTicket (交易下单组件)**: 用于提交交易订单
-- **PositionsWidget (持仓组件)**: 显示用户的当前持仓
-- **Content Page Grid Layout**: 负责页面的整体布局
+**1. React UI Layer**
+- **InstrumentSelector**: Selects the trading pair; reads/writes `instrumentAtom`
+- **TradingView Chart Datafeed**: Feeds the chart using historical/real-time data from `ExchangeAdapterManager`
+- **DepthChart**: Visualizes order book cumulative depth via REST snapshots with sticky axis and rate-limit backoff
+- **OrderBook (local state)**: Maintains local order book state and subscribes to best bid/ask
+- **TradeTicket**: Places orders
+- **PositionsWidget**: Displays current positions
+- **Content Page Grid Layout**: Manages overall page layout
 
-**2. 适配器层**
-- **ExchangeAdapterManager Singleton**: 作为核心管理器，接收来自 UI 组件的请求并路由到具体的交易所适配器
-- **BinanceAdapter WebSocket**: 具体的币安交易所适配器，负责通过 WebSocket 和 REST 与币安 API 进行通信
+**2. Adapters Layer**
+- **ExchangeAdapterManager (Singleton)**: Routes requests from UI to specific exchange adapters
+- **BinanceAdapter (WebSocket + REST)**: Connects to Binance APIs
 
-**3. 工作线程层**
-- **TradeWorkerManager**: 管理交易相关的后台工作
-- **Web Worker PnL Calculation**: 专门负责计算盈亏 (PnL)
+**3. Worker Layer**
+- **TradeWorkerManager**: Manages background tasks
+- **Web Worker PnL Calculation**: Calculates PnL off the main thread
 
-**4. 状态层 (Jotai Atoms)**
-- **instrumentAtom**: 存储当前选定的交易对信息
-- **pnlAtom**: 存储盈亏数据
-- **orderAtom**: 存储订单相关数据
-- **layoutAtom**: 存储 UI 布局相关数据
+**4. State Layer (Jotai Atoms)**
+- **instrumentAtom**: Current instrument
+- **pnlAtom**: PnL data
+- **orderAtom**: Orders
+- **layoutAtom**: UI layout
 
-**5. 数据源层**
-- **Binance API**: 提供实时的市场深度、K线数据和交易数据流，以及历史数据
+**5. Data Sources**
+- **Binance API**: Real-time depth, trades, historical data
 
 ### Data Flow
 
@@ -78,6 +80,13 @@ BinanceAdapter → TradeWorkerManager (trade data) → Web Worker → pnlAtom
 **Historical Chart Data:**
 ```
 Datafeed → BinanceAdapter.getHistoricalBars() → REST API → Chart Display
+```
+
+**Depth Chart (REST polling with rate-limit backoff):**
+```
+InstrumentSelector → instrumentAtom
+DepthChart → REST /api/v3/depth (Binance Vision endpoint) → cumulative depth → sticky x-axis rendering
+429 → read Retry-After → pause polling → resume after delay
 ```
 
 **Live Chart Data:**
@@ -117,6 +126,11 @@ Content → write layoutAtom → All widgets respond to layout changes
 - Provides historical data fetching via REST API (`getHistoricalBars`)
 - Routes trade data to TradeWorkerManager for PnL calculation
 - **Direct callback pattern**: Components subscribe directly, receive updates via callbacks
+
+**DepthChart**
+- Polls Binance REST depth snapshot with adaptive backoff (handles 429 via `Retry-After`)
+- Computes cumulative bids/asks and renders step-area curves
+- Uses sticky x-axis bounds (expand fast, shrink slowly) to stabilize view
 
 **Datafeed (TradingView Integration)**
 - Implements TradingView's IBasicDataFeed interface
@@ -256,10 +270,5 @@ pnpm format           # Format code with Biome
 pnpm type-check       # TypeScript type checking
 pnpm lighthouse       # Run Lighthouse CI
 ```
-
-## 📚 Documentation
-
-- [Architecture Decision Record](./apps/web/docs/ADR-0001-state-layer.md)
-- [PRD](./PRD.MD)
 
 
