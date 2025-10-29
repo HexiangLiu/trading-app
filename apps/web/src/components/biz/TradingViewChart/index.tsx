@@ -10,6 +10,7 @@ import {
 } from 'react'
 import { exchangeAdapterManager } from '@/adapters'
 import {
+  type CustomIndicator,
   type IChartingLibraryWidget,
   type ResolutionString,
   widget
@@ -18,6 +19,7 @@ import { ChartTab, chartTabAtom } from '@/store/chart'
 import { DEFAULT_INSTRUMENT, instrumentAtom } from '@/store/instrument'
 import type { Instrument } from '@/types/instrument'
 import { cn } from '@/utils/classMerge'
+import { createBBRsiSignalsIndicator } from './bbRsiSignals'
 import { ChartSkeleton } from './ChartSkeleton'
 import { Datafeed } from './datafeed'
 
@@ -82,8 +84,13 @@ export const TradingViewChart = memo(() => {
           'header_compare',
           'header_chart_type',
           'timeframes_toolbar'
-        ]
+        ],
+        custom_indicators_getter: PineJS =>
+          Promise.resolve<readonly CustomIndicator[]>([
+            createBBRsiSignalsIndicator(PineJS) as unknown as CustomIndicator
+          ])
       })
+
       // Reset current instrument and interval for HMR
       currentInstrumentRef.current = DEFAULT_INSTRUMENT
       currentIntervalRef.current = '240'
