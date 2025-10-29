@@ -23,6 +23,7 @@ pnpm dev
 
 - **Real-time Trading Data**: WebSocket integration with Binance API for live market data
 - **Advanced Charting**: TradingView's lightweight charts library with custom datafeed
+- **Custom Technical Indicators**: Built-in BB+RSI trading signals indicator with configurable parameters
 - **Depth Chart**: Order book depth visualization (REST polling, rate-limit backoff, sticky axis)
 - **Order Management**: Create, submit, and track orders with full validation
 - **Position Tracking**: Real-time PnL calculation with position aggregation
@@ -137,6 +138,15 @@ Content → write layoutAtom → All widgets respond to layout changes
 - Calls BinanceAdapter for historical data
 - Connects TradingView Chart to BinanceAdapter
 - Handles symbol resolution and data subscription
+- Registers custom indicators via `custom_indicators_getter`
+
+**Custom Technical Indicators**
+- **BB+RSI Signals Indicator**: Combines Bollinger Bands and RSI for buy/sell signals
+  - Buy Signal ▲: Price touches lower band AND RSI < 30 (oversold)
+  - Sell Signal ▼: Price touches upper band AND RSI > 70 (overbought)
+  - Configurable parameters: BB period, BB multiplier, RSI period, oversold/overbought thresholds
+  - Built using TradingView's PineJS API for custom studies
+  - Located in `apps/web/src/components/biz/TradingViewChart/bbRsiSignals.ts`
 
 **TradeWorkerManager**
 - Manages Web Worker lifecycle and communication
@@ -172,7 +182,8 @@ apps/web/
 │   │   ├── basic/         # Reusable UI components
 │   │   └── biz/           # Business components
 │   │       ├── TradingViewChart/
-│   │       │   └── datafeed.ts  # Connects to BinanceAdapter
+│   │       │   ├── datafeed.ts      # Connects to BinanceAdapter
+│   │       │   └── bbRsiSignals.ts  # Custom BB+RSI indicator
 │   │       ├── OrderBook/
 │   │       ├── PositionsWidget/
 │   │       └── TradeTicket/
@@ -270,5 +281,7 @@ pnpm format           # Format code with Biome
 pnpm type-check       # TypeScript type checking
 pnpm lighthouse       # Run Lighthouse CI
 ```
+
+
 
 

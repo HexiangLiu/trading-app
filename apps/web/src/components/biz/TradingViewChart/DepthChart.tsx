@@ -2,7 +2,7 @@ import * as echarts from 'echarts'
 import { useAtomValue } from 'jotai'
 import { memo, useEffect, useRef } from 'react'
 import { instrumentAtom } from '@/store/instrument'
-import { DEFAULT_CHART_OPTION } from './const'
+import { DEFAULT_CHART_OPTION } from './echartOption'
 
 export const DepthChart = memo(() => {
   const ref = useRef<HTMLDivElement>(null)
