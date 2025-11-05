@@ -9,7 +9,7 @@ import { StreamType } from '../index'
 
 const mockWorkerManager = {
   initialized: true,
-  sendTradeData: vi.fn()
+  sendMessage: vi.fn()
 }
 
 vi.mock('@/workers/tradeWorkerManager', () => ({
@@ -542,7 +542,10 @@ describe('BinanceAdapter', () => {
 
       await waitFor(() => {
         expect(callback).toHaveBeenCalled()
-        expect(mockWorkerManager.sendTradeData).toHaveBeenCalled()
+        expect(mockWorkerManager.sendMessage).toHaveBeenCalledWith({
+          type: 'TRADE_DATA',
+          data: expect.any(Object)
+        })
       })
     })
 

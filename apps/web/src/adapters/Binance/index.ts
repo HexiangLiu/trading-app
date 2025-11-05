@@ -656,7 +656,10 @@ export class BinanceAdapter implements ExchangeAdapter {
       try {
         const workerManager = getTradeWorkerManager()
         if (workerManager.initialized) {
-          workerManager.sendTradeData(trade)
+          workerManager.sendMessage({
+            type: 'TRADE_DATA',
+            data: trade
+          })
         } else {
           this.log('warn', 'Worker not initialized, cannot send trade data')
         }

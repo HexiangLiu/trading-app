@@ -147,10 +147,9 @@ export const TradeTicket = memo(() => {
           instrument.exchange
         )
 
-        // Add order to atom storage
-        setOrders(prev => [...prev, order])
-
         if (order.status === OrderStatus.PENDING) {
+          // Only add pending orders to atom storage
+          setOrders(prev => [...prev, order])
           toast.success(`Order accepted successfully`)
           // Reset form
           setFormData({

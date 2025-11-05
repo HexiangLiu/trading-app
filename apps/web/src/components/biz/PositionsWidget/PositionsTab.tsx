@@ -18,38 +18,20 @@ export const PositionsTab = memo(() => {
   return (
     <div className="space-y-4" data-testid="positions-tab-content">
       {/* PnL Summary */}
-      <div className="grid grid-cols-2 gap-4">
-        <div className="bg-white dark:bg-gray-800 rounded-lg p-4 border border-gray-200 dark:border-gray-700">
-          <div className="text-xs sm:text-sm text-gray-500 dark:text-gray-400">
-            Unrealized PnL
-          </div>
-          <div
-            className={cn(
-              'text-base sm:text-lg font-semibold',
-              pnlData.totalUnrealizedPnL >= 0
-                ? 'text-green-600 dark:text-green-400'
-                : 'text-red-600 dark:text-red-400'
-            )}
-          >
-            {pnlData.totalUnrealizedPnL >= 0 ? '+' : ''}
-            {pnlData.totalUnrealizedPnL.toFixed(2)} USDT
-          </div>
+      <div className="bg-white dark:bg-gray-800 rounded-lg p-4 border border-gray-200 dark:border-gray-700">
+        <div className="text-xs sm:text-sm text-gray-500 dark:text-gray-400">
+          Total Unrealized PnL
         </div>
-        <div className="bg-white dark:bg-gray-800 rounded-lg p-4 border border-gray-200 dark:border-gray-700">
-          <div className="text-xs sm:text-sm text-gray-500 dark:text-gray-400">
-            Realized PnL
-          </div>
-          <div
-            className={cn(
-              'text-base sm:text-lg font-semibold',
-              pnlData.totalRealizedPnL >= 0
-                ? 'text-green-600 dark:text-green-400'
-                : 'text-red-600 dark:text-red-400'
-            )}
-          >
-            {pnlData.totalRealizedPnL >= 0 ? '+' : ''}
-            {pnlData.totalRealizedPnL.toFixed(2)} USDT
-          </div>
+        <div
+          className={cn(
+            'text-base sm:text-lg font-semibold',
+            pnlData.totalUnrealizedPnL >= 0
+              ? 'text-green-600 dark:text-green-400'
+              : 'text-red-600 dark:text-red-400'
+          )}
+        >
+          {pnlData.totalUnrealizedPnL >= 0 ? '+' : ''}
+          {pnlData.totalUnrealizedPnL.toFixed(2)} USDT
         </div>
       </div>
 
@@ -71,7 +53,7 @@ export const PositionsTab = memo(() => {
                 </span>
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-4 text-sm">
+            <div className="grid grid-cols-3 gap-4 text-sm">
               <div>
                 <div className="text-xs sm:text-sm text-gray-500 dark:text-gray-400">
                   Quantity
@@ -86,8 +68,6 @@ export const PositionsTab = memo(() => {
                   {position.averagePrice.toFixed(2)} USDT
                 </div>
               </div>
-            </div>
-            <div className="grid grid-cols-2 gap-4 text-sm mt-2">
               <div>
                 <div className="text-xs sm:text-sm text-gray-500 dark:text-gray-400">
                   Unrealized PnL
@@ -102,22 +82,6 @@ export const PositionsTab = memo(() => {
                 >
                   {position.unrealizedPnL >= 0 ? '+' : ''}
                   {position.unrealizedPnL.toFixed(2)} USDT
-                </div>
-              </div>
-              <div>
-                <div className="text-xs sm:text-sm text-gray-500 dark:text-gray-400">
-                  Realized PnL
-                </div>
-                <div
-                  className={cn(
-                    'font-mono',
-                    position.realizedPnL >= 0
-                      ? 'text-green-600 dark:text-green-400'
-                      : 'text-red-600 dark:text-red-400'
-                  )}
-                >
-                  {position.realizedPnL >= 0 ? '+' : ''}
-                  {position.realizedPnL.toFixed(2)} USDT
                 </div>
               </div>
             </div>

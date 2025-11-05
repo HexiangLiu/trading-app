@@ -122,7 +122,6 @@ describe('validateOrder', () => {
         quantity: 0.01,
         averagePrice: 50000,
         unrealizedPnL: 0,
-        realizedPnL: 0,
         lastUpdate: Date.now()
       }
     ]

@@ -41,7 +41,10 @@ export function useAggregatedPrices() {
   const subscribe = useCallback((symbol: string) => {
     const workerManager = getTradeWorkerManager()
     if (workerManager.initialized) {
-      workerManager.subscribe(symbol)
+      workerManager.sendMessage({
+        type: 'SUBSCRIBE',
+        data: { symbol }
+      })
     }
   }, [])
 
@@ -49,7 +52,10 @@ export function useAggregatedPrices() {
   const unsubscribe = useCallback((symbol: string) => {
     const workerManager = getTradeWorkerManager()
     if (workerManager.initialized) {
-      workerManager.unsubscribe(symbol)
+      workerManager.sendMessage({
+        type: 'UNSUBSCRIBE',
+        data: { symbol }
+      })
     }
   }, [])
 

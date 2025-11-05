@@ -61,10 +61,14 @@ describe('TradeWorkerManager', () => {
     })
   })
 
-  describe('subscribe', () => {
-    it('should send SUBSCRIBE message to worker', () => {
+  describe('sendMessage', () => {
+    it('should send message to worker', () => {
       const worker = (manager as any).worker as MockWorker
-      manager.subscribe('BTCUSDT')
+
+      manager.sendMessage({
+        type: 'SUBSCRIBE',
+        data: { symbol: 'BTCUSDT' }
+      })
 
       expect(worker.lastMessage).toEqual({
         type: 'SUBSCRIBE',
@@ -76,42 +80,20 @@ describe('TradeWorkerManager', () => {
       ;(manager as any).isInitialized = false
       ;(manager as any).worker = null
 
-      manager.subscribe('BTCUSDT')
-
-      expect(globalThis.console.warn).toHaveBeenCalledWith(
-        'Worker not initialized, cannot subscribe to:',
-        'BTCUSDT'
-      )
-    })
-  })
-
-  describe('unsubscribe', () => {
-    it('should send UNSUBSCRIBE message to worker', () => {
-      const worker = (manager as any).worker as MockWorker
-      manager.unsubscribe('BTCUSDT')
-
-      expect(worker.lastMessage).toEqual({
-        type: 'UNSUBSCRIBE',
+      manager.sendMessage({
+        type: 'SUBSCRIBE',
         data: { symbol: 'BTCUSDT' }
       })
-    })
-
-    it('should not send message if worker not initialized', () => {
-      ;(manager as any).isInitialized = false
-      ;(manager as any).worker = null
-
-      manager.unsubscribe('BTCUSDT')
 
       expect(globalThis.console.warn).toHaveBeenCalledWith(
-        'Worker not initialized, cannot unsubscribe from:',
-        'BTCUSDT'
+        'Worker not initialized, cannot send message:',
+        'SUBSCRIBE'
       )
     })
-  })
 
-  describe('sendTradeData', () => {
-    it('should send TRADE_DATA message to worker', () => {
+    it('should handle various message types', () => {
       const worker = (manager as any).worker as MockWorker
+
       const tradeData: TradeData = {
         symbol: 'BTCUSDT',
         price: 50000,
@@ -119,33 +101,16 @@ describe('TradeWorkerManager', () => {
         timestamp: Date.now()
       }
 
-      manager.sendTradeData(tradeData)
+      manager.sendMessage({
+        type: 'TRADE_DATA',
+        data: tradeData
+      })
 
       expect(worker.lastMessage).toEqual({
         type: 'TRADE_DATA',
         data: tradeData
       })
-    })
 
-    it('should not send message if worker not initialized', () => {
-      const worker = (manager as any).worker as MockWorker
-      ;(manager as any).isInitialized = false
-      ;(manager as any).worker = null
-
-      manager.sendTradeData({
-        symbol: 'BTCUSDT',
-        price: 50000,
-        quantity: 0.1,
-        timestamp: Date.now()
-      })
-
-      expect(worker.lastMessage).toBeUndefined()
-    })
-  })
-
-  describe('updateOrders', () => {
-    it('should send ORDERS_UPDATE message to worker', () => {
-      const worker = (manager as any).worker as MockWorker
       const orders: Order[] = [
         {
           id: '1',
@@ -161,22 +126,15 @@ describe('TradeWorkerManager', () => {
         }
       ]
 
-      manager.updateOrders(orders)
+      manager.sendMessage({
+        type: 'ORDERS_UPDATE',
+        data: { orders }
+      })
 
       expect(worker.lastMessage).toEqual({
         type: 'ORDERS_UPDATE',
         data: { orders }
       })
-    })
-
-    it('should not send message if worker not initialized', () => {
-      const worker = (manager as any).worker as MockWorker
-      ;(manager as any).isInitialized = false
-      ;(manager as any).worker = null
-
-      manager.updateOrders([])
-
-      expect(worker.lastMessage).toBeUndefined()
     })
   })
 
@@ -203,8 +161,7 @@ describe('TradeWorkerManager', () => {
       const worker = (manager as any).worker as MockWorker
       const mockPnLData = {
         positions: [],
-        totalUnrealizedPnL: 0,
-        totalRealizedPnL: 0
+        totalUnrealizedPnL: 0
       }
 
       worker.simulateMessage({
@@ -221,9 +178,8 @@ describe('TradeWorkerManager', () => {
 
       const worker = (manager as any).worker as MockWorker
       const mockClosedData = {
-        symbol: 'binance:BTCUSDT',
-        closedOrders: [],
-        realizedPnL: 100
+        exchange: 'binance',
+        symbol: 'BTCUSDT'
       }
 
       worker.simulateMessage({
