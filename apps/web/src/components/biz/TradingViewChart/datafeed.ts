@@ -4,6 +4,7 @@
  * 实现TradingView IBasicDataFeed接口
  */
 
+import { exchangeAdapterManager, StreamType } from '@/adapters'
 import type {
   DatafeedConfiguration,
   DatafeedErrorCallback,
@@ -18,16 +19,6 @@ import type {
   SubscribeBarsCallback
 } from '@/charting_library'
 import type { Exchange } from '@/types/instrument'
-
-export interface Bar {
-  time: number
-  open: number
-  high: number
-  low: number
-  close: number
-  volume: number
-  symbol?: string // 可选的symbol标识
-}
 
 export class Datafeed implements IBasicDataFeed {
   /**
@@ -141,18 +132,9 @@ export class Datafeed implements IBasicDataFeed {
       const intervalMs = this.getIntervalMs(resolution)
       const limit = Math.min(Math.ceil(timeDiff / intervalMs), 1000)
 
-      // Import exchangeAdapterManager here to avoid circular dependency
-      import('@/adapters')
-        .then(({ exchangeAdapterManager }) => {
-          const adapter = exchangeAdapterManager.getAdapter(exchange as any)
-          return adapter.getHistoricalBars(
-            symbol,
-            resolution,
-            startTime,
-            endTime,
-            limit
-          )
-        })
+      const adapter = exchangeAdapterManager.getAdapter(exchange as any)
+      adapter
+        .getHistoricalBars(symbol, resolution, startTime, endTime, limit)
         .then((bars: any[]) => {
           onResult(bars, { noData: bars.length === 0 })
         })
@@ -198,18 +180,13 @@ export class Datafeed implements IBasicDataFeed {
 
     console.log('Subscribe bars:', subscribeUID, symbol, exchange, resolution)
 
-    // Import exchangeAdapterManager here to avoid circular dependency
-    import('@/adapters').then(({ exchangeAdapterManager }) => {
-      exchangeAdapterManager.subscribe(exchange as Exchange, {
-        symbol: symbol,
-        streamType: 'kline',
-        interval: resolution,
-        callback: onRealtimeCallback
-      })
+    exchangeAdapterManager.subscribe(exchange as Exchange, {
+      symbol: symbol,
+      streamType: StreamType.KLINE,
+      interval: resolution,
+      callback: onRealtimeCallback
     })
   }
 
   unsubscribeBars(_subscribeUID: string): void {}
 }
-
-export const datafeed = new Datafeed()

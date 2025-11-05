@@ -4,7 +4,7 @@ import { OrderStatus, OrderType } from '@/types/order'
 /**
  * Mock order service for simulating order placement
  */
-export class OrderService {
+class OrderService {
   /**
    * Submit a new order (mock implementation)
    */

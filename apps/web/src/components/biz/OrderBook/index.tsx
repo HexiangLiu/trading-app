@@ -1,6 +1,6 @@
 import { useAtomValue } from 'jotai'
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { exchangeAdapterManager } from '@/adapters'
+import { exchangeAdapterManager, StreamType } from '@/adapters'
 import { useVisibleRows } from '@/hooks/useVisibleRows'
 import { instrumentAtom } from '@/store/instrument'
 import { InstrumentName } from '@/types/instrument'
@@ -74,19 +74,17 @@ export const OrderBook = memo(() => {
     // Subscribe to depth stream
     exchangeAdapterManager.subscribe(instrument.exchange, {
       symbol: instrument.name,
-      streamType: 'depth',
+      streamType: StreamType.DEPTH,
       callback: throttledUpdate
     })
 
     // Cleanup: unsubscribe when component unmounts or instrument changes
     return () => {
-      exchangeAdapterManager.unsubscribe(
-        instrument.exchange,
-        instrument.name,
-        'depth',
-        undefined,
-        throttledUpdate
-      )
+      exchangeAdapterManager.unsubscribe(instrument.exchange, {
+        symbol: instrument.name,
+        streamType: StreamType.DEPTH,
+        callback: throttledUpdate
+      })
     }
   }, [instrument, throttledUpdate])
 

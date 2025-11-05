@@ -3,12 +3,13 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { MockWebSocket } from '@/test/utils/mockWebSocket'
 import { BinanceAdapter } from '../Binance'
 import type { StreamSubscription } from '../index'
+import { StreamType } from '../index'
 
 // ==================== Mocks & Setup ====================
 
 const mockWorkerManager = {
   initialized: true,
-  sendTradeData: vi.fn()
+  sendMessage: vi.fn()
 }
 
 vi.mock('@/workers/tradeWorkerManager', () => ({
@@ -91,7 +92,7 @@ function createTradeData(type: 'aggTrade' | 'trade' = 'aggTrade') {
  * Creates subscription configuration
  */
 function createSubscription(
-  streamType: 'kline' | 'depth' | 'trade',
+  streamType: StreamType,
   callback: any = vi.fn(),
   interval?: string
 ): StreamSubscription {
@@ -188,7 +189,7 @@ describe('BinanceAdapter', () => {
   describe('subscribe', () => {
     it('should subscribe to kline stream', async () => {
       const callback = vi.fn()
-      const subscription = createSubscription('kline', callback, '1m')
+      const subscription = createSubscription(StreamType.KLINE, callback, '1m')
 
       adapter.subscribe(subscription)
 
@@ -208,7 +209,11 @@ describe('BinanceAdapter', () => {
         MockWebSocket.clearInstances()
         adapter = new BinanceAdapter()
 
-        const subscription = createSubscription('kline', callback, intervals[i])
+        const subscription = createSubscription(
+          StreamType.KLINE,
+          callback,
+          intervals[i]
+        )
 
         adapter.subscribe(subscription)
         const ws = await waitForSubscription()
@@ -221,7 +226,7 @@ describe('BinanceAdapter', () => {
     })
 
     it('should subscribe to depth stream', async () => {
-      const subscription = createSubscription('depth')
+      const subscription = createSubscription(StreamType.DEPTH)
       adapter.subscribe(subscription)
 
       const ws = await waitForSubscription()
@@ -231,7 +236,7 @@ describe('BinanceAdapter', () => {
     })
 
     it('should subscribe to trade stream', async () => {
-      const subscription = createSubscription('trade')
+      const subscription = createSubscription(StreamType.TRADE)
       adapter.subscribe(subscription)
 
       const ws = await waitForSubscription()
@@ -242,7 +247,7 @@ describe('BinanceAdapter', () => {
 
     it('should not add duplicate subscriptions', async () => {
       const callback = vi.fn()
-      const subscription = createSubscription('trade', callback)
+      const subscription = createSubscription(StreamType.TRADE, callback)
 
       adapter.subscribe(subscription)
       const ws1 = await waitForSubscription()
@@ -258,8 +263,8 @@ describe('BinanceAdapter', () => {
       const callback1 = vi.fn()
       const callback2 = vi.fn()
 
-      const subscription1 = createSubscription('trade', callback1)
-      const subscription2 = createSubscription('trade', callback2)
+      const subscription1 = createSubscription(StreamType.TRADE, callback1)
+      const subscription2 = createSubscription(StreamType.TRADE, callback2)
 
       adapter.subscribe(subscription1)
       await waitForSubscription()
@@ -276,18 +281,26 @@ describe('BinanceAdapter', () => {
       const callback1 = vi.fn()
       const callback2 = vi.fn()
 
-      const subscription1 = createSubscription('trade', callback1)
-      const subscription2 = createSubscription('trade', callback2)
+      const subscription1 = createSubscription(StreamType.TRADE, callback1)
+      const subscription2 = createSubscription(StreamType.TRADE, callback2)
 
       adapter.subscribe(subscription1)
       adapter.subscribe(subscription2)
       await waitForSubscription()
 
       // Remove one callback - should NOT send UNSUBSCRIBE (still have callback2)
-      adapter.unsubscribe('BTCUSDT', 'trade', undefined, callback1)
+      adapter.unsubscribe({
+        symbol: 'BTCUSDT',
+        streamType: StreamType.TRADE,
+        callback: callback1
+      })
 
       // Remove the last callback - should send UNSUBSCRIBE
-      adapter.unsubscribe('BTCUSDT', 'trade', undefined, callback2)
+      adapter.unsubscribe({
+        symbol: 'BTCUSDT',
+        streamType: StreamType.TRADE,
+        callback: callback2
+      })
 
       await waitFor(() => {
         const ws = MockWebSocket.getLatest()
@@ -298,12 +311,12 @@ describe('BinanceAdapter', () => {
     })
 
     it('should unsubscribe all callbacks when no callback specified', async () => {
-      const subscription = createSubscription('trade')
+      const subscription = createSubscription(StreamType.TRADE)
 
       adapter.subscribe(subscription)
       await waitForSubscription()
 
-      adapter.unsubscribe('BTCUSDT', 'trade')
+      adapter.unsubscribe({ symbol: 'BTCUSDT', streamType: StreamType.TRADE })
 
       await waitFor(() => {
         const ws = MockWebSocket.getLatest()
@@ -314,29 +327,12 @@ describe('BinanceAdapter', () => {
     })
 
     it('should handle unsubscribe when not connected', () => {
-      const subscription = createSubscription('trade')
+      const subscription = createSubscription(StreamType.TRADE)
 
       adapter.subscribe(subscription)
-      adapter.unsubscribe('BTCUSDT', 'trade')
+      adapter.unsubscribe({ symbol: 'BTCUSDT', streamType: StreamType.TRADE })
 
       // Should not throw - this verifies the method works without errors
-    })
-  })
-
-  describe('unsubscribeAll', () => {
-    it('should unsubscribe from all streams for a symbol', async () => {
-      const callback = vi.fn()
-
-      adapter.subscribe(createSubscription('kline', callback, '1m'))
-
-      adapter.subscribe(createSubscription('trade', callback))
-
-      await waitForSubscription(2)
-
-      adapter.unsubscribeAll('BTCUSDT')
-
-      // Verify unsubscribeAll was called without errors
-      // The internal state is not directly accessible, but the method should complete successfully
     })
   })
 
@@ -364,15 +360,17 @@ describe('BinanceAdapter', () => {
       await connectPromise1
 
       // Second connection
-      const consoleLogSpy = vi.spyOn(console, 'log')
+      const consoleInfoSpy = vi.spyOn(console, 'info')
       await adapter.connect()
 
-      expect(consoleLogSpy).toHaveBeenCalledWith('already connected')
+      expect(consoleInfoSpy).toHaveBeenCalledWith(
+        '[BinanceAdapter] Already connected'
+      )
     })
 
     it('should subscribe to active streams on connect', async () => {
       const callback = vi.fn()
-      adapter.subscribe(createSubscription('trade', callback))
+      adapter.subscribe(createSubscription(StreamType.TRADE, callback))
 
       const connectPromise = adapter.connect()
       const ws = MockWebSocket.getLatest()
@@ -405,7 +403,7 @@ describe('BinanceAdapter', () => {
       ws?.simulateError(errorEvent)
 
       expect(globalThis.console.error).toHaveBeenCalledWith(
-        'Binance WebSocket error:',
+        '[BinanceAdapter] WebSocket error:',
         errorEvent
       )
     })
@@ -419,7 +417,7 @@ describe('BinanceAdapter', () => {
 
       await waitFor(() => {
         expect(globalThis.console.error).toHaveBeenCalledWith(
-          'Error parsing WebSocket message:',
+          '[BinanceAdapter] Error parsing WebSocket message:',
           expect.any(Error)
         )
       })
@@ -429,7 +427,7 @@ describe('BinanceAdapter', () => {
   describe('handleMessage', () => {
     it('should handle kline data', async () => {
       const callback = vi.fn()
-      adapter.subscribe(createSubscription('kline', callback, '1m'))
+      adapter.subscribe(createSubscription(StreamType.KLINE, callback, '1m'))
 
       await waitForSubscription()
 
@@ -459,14 +457,14 @@ describe('BinanceAdapter', () => {
 
       await waitFor(() => {
         expect(globalThis.console.warn).toHaveBeenCalledWith(
-          'No kline subscriptions found for raw data'
+          '[BinanceAdapter] No kline subscriptions found for raw data'
         )
       })
     })
 
     it('should handle order book data', async () => {
       const callback = vi.fn()
-      adapter.subscribe(createSubscription('depth', callback))
+      adapter.subscribe(createSubscription(StreamType.DEPTH, callback))
 
       await waitForSubscription()
 
@@ -499,7 +497,7 @@ describe('BinanceAdapter', () => {
       const callback = vi.fn(() => {
         throw new Error('Order book callback error')
       })
-      adapter.subscribe(createSubscription('depth', callback))
+      adapter.subscribe(createSubscription(StreamType.DEPTH, callback))
 
       await waitForSubscription()
 
@@ -510,7 +508,7 @@ describe('BinanceAdapter', () => {
 
       await waitFor(() => {
         expect(globalThis.console.error).toHaveBeenCalledWith(
-          'BinanceAdapter: Error calling order book callback:',
+          '[BinanceAdapter] Error calling depth callback:',
           expect.any(Error)
         )
       })
@@ -526,14 +524,14 @@ describe('BinanceAdapter', () => {
 
       await waitFor(() => {
         expect(globalThis.console.warn).toHaveBeenCalledWith(
-          'No depth subscriptions found for raw data'
+          '[BinanceAdapter] No depth subscriptions found for raw data'
         )
       })
     })
 
     it('should handle trade data', async () => {
       const callback = vi.fn()
-      adapter.subscribe(createSubscription('trade', callback))
+      adapter.subscribe(createSubscription(StreamType.TRADE, callback))
 
       await waitForSubscription()
 
@@ -544,14 +542,17 @@ describe('BinanceAdapter', () => {
 
       await waitFor(() => {
         expect(callback).toHaveBeenCalled()
-        expect(mockWorkerManager.sendTradeData).toHaveBeenCalled()
+        expect(mockWorkerManager.sendMessage).toHaveBeenCalledWith({
+          type: 'TRADE_DATA',
+          data: expect.any(Object)
+        })
       })
     })
 
     it('should handle trade data with worker not initialized', async () => {
       mockWorkerManager.initialized = false
       const callback = vi.fn()
-      adapter.subscribe(createSubscription('trade', callback))
+      adapter.subscribe(createSubscription(StreamType.TRADE, callback))
 
       await waitForSubscription()
 
@@ -565,13 +566,13 @@ describe('BinanceAdapter', () => {
       })
 
       expect(globalThis.console.warn).toHaveBeenCalledWith(
-        'Worker not initialized, cannot send trade data'
+        '[BinanceAdapter] Worker not initialized, cannot send trade data'
       )
     })
 
     it('should handle regular trade data (not aggTrade)', async () => {
       const callback = vi.fn()
-      adapter.subscribe(createSubscription('trade', callback))
+      adapter.subscribe(createSubscription(StreamType.TRADE, callback))
 
       await waitForSubscription()
 
@@ -589,7 +590,7 @@ describe('BinanceAdapter', () => {
       const callback = vi.fn(() => {
         throw new Error('Callback error')
       })
-      adapter.subscribe(createSubscription('trade', callback))
+      adapter.subscribe(createSubscription(StreamType.TRADE, callback))
 
       await waitForSubscription()
 
@@ -600,7 +601,7 @@ describe('BinanceAdapter', () => {
 
       await waitFor(() => {
         expect(globalThis.console.error).toHaveBeenCalledWith(
-          'BinanceAdapter: Error calling trade callback:',
+          '[BinanceAdapter] Error calling trade callback:',
           expect.any(Error)
         )
       })
@@ -616,14 +617,14 @@ describe('BinanceAdapter', () => {
 
       await waitFor(() => {
         expect(globalThis.console.warn).toHaveBeenCalledWith(
-          'No trade subscriptions found for raw data'
+          '[BinanceAdapter] No trade subscriptions found for raw data'
         )
       })
     })
 
     it('should ignore subscription confirmation messages', async () => {
       const callback = vi.fn()
-      adapter.subscribe(createSubscription('trade', callback))
+      adapter.subscribe(createSubscription(StreamType.TRADE, callback))
 
       await waitForSubscription()
 
@@ -694,7 +695,7 @@ describe('BinanceAdapter', () => {
     it('should attempt reconnection on unexpected close', async () => {
       // Subscribe first to create active streams
       const callback = vi.fn()
-      adapter.subscribe(createSubscription('trade', callback))
+      adapter.subscribe(createSubscription(StreamType.TRADE, callback))
       await waitForSubscription()
 
       const initialInstanceCount = MockWebSocket.instances.length
@@ -748,7 +749,7 @@ describe('BinanceAdapter', () => {
     it('should stop reconnecting after max attempts', async () => {
       // Subscribe first to create active streams
       const callback = vi.fn()
-      adapter.subscribe(createSubscription('trade', callback))
+      adapter.subscribe(createSubscription(StreamType.TRADE, callback))
       await waitForSubscription()
 
       // Force max reconnect attempts
@@ -763,14 +764,14 @@ describe('BinanceAdapter', () => {
       await new Promise(resolve => setTimeout(resolve, 100))
 
       expect(globalThis.console.error).toHaveBeenCalledWith(
-        'Max reconnection attempts reached'
+        '[BinanceAdapter] Max reconnection attempts reached'
       )
     })
 
     it('should handle reconnection failure and retry', async () => {
       // Subscribe first to create active streams
       const callback = vi.fn()
-      adapter.subscribe(createSubscription('trade', callback))
+      adapter.subscribe(createSubscription(StreamType.TRADE, callback))
       await waitForSubscription()
 
       // Mock connect to fail first time

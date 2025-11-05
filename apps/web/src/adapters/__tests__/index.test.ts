@@ -3,7 +3,8 @@ import { Exchange } from '@/types/instrument'
 import {
   type ExchangeAdapter,
   ExchangeAdapterManager,
-  type StreamSubscription
+  type StreamSubscription,
+  StreamType
 } from '../index'
 
 // Mock Binance adapter
@@ -22,7 +23,6 @@ describe('ExchangeAdapterManager', () => {
     vi.mocked(mockBinanceAdapter.connect).mockResolvedValue(undefined)
     vi.mocked(mockBinanceAdapter.subscribe).mockImplementation(() => {})
     vi.mocked(mockBinanceAdapter.unsubscribe).mockImplementation(() => {})
-    vi.mocked(mockBinanceAdapter.unsubscribeAll).mockImplementation(() => {})
     vi.mocked(mockBinanceAdapter.getHistoricalBars).mockResolvedValue([])
     vi.mocked(mockBinanceAdapter.getExchange).mockReturnValue('BINANCE')
 
@@ -36,9 +36,8 @@ describe('ExchangeAdapterManager', () => {
 
   describe('constructor', () => {
     it('should initialize with Binance adapter', () => {
-      const activeAdapters = manager.getActiveAdapters()
-      expect(activeAdapters.has(Exchange.BINANCE)).toBe(true)
-      expect(activeAdapters.get(Exchange.BINANCE)).toBe(mockBinanceAdapter)
+      const adapter = manager.getAdapter(Exchange.BINANCE)
+      expect(adapter).toBe(mockBinanceAdapter)
     })
   })
 
@@ -49,12 +48,11 @@ describe('ExchangeAdapterManager', () => {
     })
 
     it('should create new adapter for known exchange', () => {
-      // Remove the default Binance adapter
-      const activeAdapters = manager.getActiveAdapters()
-      activeAdapters.delete(Exchange.BINANCE)
-
-      const adapter = manager.getAdapter(Exchange.BINANCE)
-      expect(adapter).toBe(mockBinanceAdapter)
+      // Test that getAdapter returns the same adapter instance
+      const adapter1 = manager.getAdapter(Exchange.BINANCE)
+      const adapter2 = manager.getAdapter(Exchange.BINANCE)
+      expect(adapter1).toBe(adapter2)
+      expect(adapter1).toBe(mockBinanceAdapter)
     })
 
     it('should fallback to Binance for unknown exchange', () => {
@@ -79,7 +77,7 @@ describe('ExchangeAdapterManager', () => {
     it('should subscribe to a stream', () => {
       const subscription: StreamSubscription = {
         symbol: 'BTCUSDT',
-        streamType: 'trade',
+        streamType: StreamType.TRADE,
         callback: vi.fn()
       }
 
@@ -91,76 +89,41 @@ describe('ExchangeAdapterManager', () => {
 
   describe('unsubscribe', () => {
     it('should unsubscribe from a stream when adapter exists', () => {
-      manager.unsubscribe(Exchange.BINANCE, 'BTCUSDT', 'trade')
+      manager.unsubscribe(Exchange.BINANCE, {
+        symbol: 'BTCUSDT',
+        streamType: StreamType.TRADE
+      })
 
-      expect(mockBinanceAdapter.unsubscribe).toHaveBeenCalledWith(
-        'BTCUSDT',
-        'trade',
-        undefined,
-        undefined
-      )
+      expect(mockBinanceAdapter.unsubscribe).toHaveBeenCalledWith({
+        symbol: 'BTCUSDT',
+        streamType: StreamType.TRADE
+      })
     })
 
     it('should not throw when adapter does not exist', () => {
       const unknownExchange = 'UNKNOWN' as Exchange
 
       expect(() => {
-        manager.unsubscribe(unknownExchange, 'BTCUSDT', 'trade')
+        manager.unsubscribe(unknownExchange, {
+          symbol: 'BTCUSDT',
+          streamType: StreamType.TRADE
+        })
       }).not.toThrow()
     })
 
     it('should unsubscribe with callback when provided', () => {
       const callback = vi.fn()
-      manager.unsubscribe(
-        Exchange.BINANCE,
-        'BTCUSDT',
-        'trade',
-        undefined,
+      manager.unsubscribe(Exchange.BINANCE, {
+        symbol: 'BTCUSDT',
+        streamType: StreamType.TRADE,
         callback
-      )
+      })
 
-      expect(mockBinanceAdapter.unsubscribe).toHaveBeenCalledWith(
-        'BTCUSDT',
-        'trade',
-        undefined,
+      expect(mockBinanceAdapter.unsubscribe).toHaveBeenCalledWith({
+        symbol: 'BTCUSDT',
+        streamType: StreamType.TRADE,
         callback
-      )
-    })
-  })
-
-  describe('unsubscribeAll', () => {
-    it('should unsubscribe from all streams when adapter exists', () => {
-      manager.unsubscribeAll(Exchange.BINANCE, 'BTCUSDT')
-
-      expect(mockBinanceAdapter.unsubscribeAll).toHaveBeenCalledWith('BTCUSDT')
-    })
-
-    it('should not throw when adapter does not exist', () => {
-      const unknownExchange = 'UNKNOWN' as Exchange
-
-      expect(() => {
-        manager.unsubscribeAll(unknownExchange, 'BTCUSDT')
-      }).not.toThrow()
-    })
-  })
-
-  describe('getActiveAdapters', () => {
-    it('should return a copy of adapters map', () => {
-      const adapters = manager.getActiveAdapters()
-      expect(adapters).toBeInstanceOf(Map)
-      expect(adapters.size).toBeGreaterThan(0)
-    })
-
-    it('should return independent copy', () => {
-      const adapters1 = manager.getActiveAdapters()
-      const adapters2 = manager.getActiveAdapters()
-
-      // Modifying the returned map should not affect the internal map
-      adapters1.set(Exchange.BINANCE, mockBinanceAdapter)
-
-      // But the same adapter reference should still exist
-      expect(adapters1.get(Exchange.BINANCE)).toBe(mockBinanceAdapter)
-      expect(adapters2.get(Exchange.BINANCE)).toBe(mockBinanceAdapter)
+      })
     })
   })
 })

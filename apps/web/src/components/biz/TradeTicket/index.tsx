@@ -1,7 +1,7 @@
 import { useAtomValue, useSetAtom } from 'jotai'
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { toast } from 'react-toastify'
-import { exchangeAdapterManager } from '@/adapters'
+import { exchangeAdapterManager, StreamType } from '@/adapters'
 import { orderService } from '@/services/orderService'
 import { instrumentAtom } from '@/store/instrument'
 import { orderAtom } from '@/store/order'
@@ -52,19 +52,17 @@ export const TradeTicket = memo(() => {
     // Subscribe to depth stream
     exchangeAdapterManager.subscribe(instrument.exchange, {
       symbol: instrument.name,
-      streamType: 'depth',
+      streamType: StreamType.DEPTH,
       callback: handleOrderBookUpdate
     })
 
     // Cleanup: unsubscribe when component unmounts or instrument changes
     return () => {
-      exchangeAdapterManager.unsubscribe(
-        instrument.exchange,
-        instrument.name,
-        'depth',
-        undefined,
-        handleOrderBookUpdate
-      )
+      exchangeAdapterManager.unsubscribe(instrument.exchange, {
+        symbol: instrument.name,
+        streamType: StreamType.DEPTH,
+        callback: handleOrderBookUpdate
+      })
     }
   }, [instrument])
 
@@ -149,10 +147,9 @@ export const TradeTicket = memo(() => {
           instrument.exchange
         )
 
-        // Add order to atom storage
-        setOrders(prev => [...prev, order])
-
         if (order.status === OrderStatus.PENDING) {
+          // Only add pending orders to atom storage
+          setOrders(prev => [...prev, order])
           toast.success(`Order accepted successfully`)
           // Reset form
           setFormData({

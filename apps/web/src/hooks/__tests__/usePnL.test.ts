@@ -7,7 +7,7 @@ import { usePnL } from '../usePnL'
 // Mock tradeWorkerManager
 const mockWorkerManagerData = {
   initialized: true,
-  updateOrders: vi.fn(),
+  sendMessage: vi.fn(),
   onMessage: vi.fn(),
   offMessage: vi.fn()
 }
@@ -46,7 +46,6 @@ describe('usePnL', () => {
     expect(result.current.pnlData).toBeDefined()
     expect(result.current.pnlData.positions).toEqual([])
     expect(result.current.pnlData.totalUnrealizedPnL).toBe(0)
-    expect(result.current.pnlData.totalRealizedPnL).toBe(0)
   })
 
   it('should update orders in worker when orders change', async () => {
@@ -60,7 +59,7 @@ describe('usePnL', () => {
     })
 
     await waitFor(() => {
-      expect(workerManager.updateOrders).toHaveBeenCalled()
+      expect(workerManager.sendMessage).toHaveBeenCalled()
     })
 
     // Change orders
@@ -69,7 +68,10 @@ describe('usePnL', () => {
     })
 
     await waitFor(() => {
-      expect(workerManager.updateOrders).toHaveBeenCalledWith([mockOrder])
+      expect(workerManager.sendMessage).toHaveBeenCalledWith({
+        type: 'ORDERS_UPDATE',
+        data: { orders: [mockOrder] }
+      })
     })
   })
 
@@ -109,7 +111,7 @@ describe('usePnL', () => {
 
     expect(handler).toBeDefined()
 
-    // Simulate PnL update
+    // Simulate PnL update (no longer includes totalRealizedPnL)
     const mockPnLData = {
       positions: [
         {
@@ -118,12 +120,10 @@ describe('usePnL', () => {
           quantity: 0.01,
           averagePrice: 50000,
           unrealizedPnL: 100,
-          realizedPnL: 0,
           lastUpdate: Date.now()
         }
       ],
-      totalUnrealizedPnL: 100,
-      totalRealizedPnL: 0
+      totalUnrealizedPnL: 100
     }
 
     act(() => {
@@ -153,25 +153,9 @@ describe('usePnL', () => {
     expect(handler).toBeDefined()
 
     // Simulate position closed event
-    const mockClosedOrders = [
-      {
-        id: 'order_1',
-        symbol: 'BTCUSDT',
-        exchange: 'binance',
-        side: OrderSide.BUY,
-        type: OrderType.LIMIT,
-        price: 50000,
-        quantity: 0.01,
-        postOnly: false,
-        status: OrderStatus.FILLED,
-        timestamp: Date.now()
-      }
-    ]
-
     const payload = {
-      symbol: 'binance:BTCUSDT',
-      closedOrders: mockClosedOrders,
-      realizedPnL: 100
+      exchange: 'binance',
+      symbol: 'BTCUSDT'
     }
 
     // The handler should not throw when called with a valid payload
@@ -229,12 +213,10 @@ describe('usePnL', () => {
             quantity: 0.01,
             averagePrice: 50000,
             unrealizedPnL: 100,
-            realizedPnL: 0,
             lastUpdate: Date.now()
           }
         ],
-        totalUnrealizedPnL: 100,
-        totalRealizedPnL: 0
+        totalUnrealizedPnL: 100
       })
     })
 
@@ -252,7 +234,6 @@ describe('usePnL', () => {
             quantity: 0.01,
             averagePrice: 50000,
             unrealizedPnL: 150,
-            realizedPnL: 0,
             lastUpdate: Date.now()
           },
           {
@@ -261,12 +242,10 @@ describe('usePnL', () => {
             quantity: 0.5,
             averagePrice: 3000,
             unrealizedPnL: 50,
-            realizedPnL: 0,
             lastUpdate: Date.now()
           }
         ],
-        totalUnrealizedPnL: 200,
-        totalRealizedPnL: 0
+        totalUnrealizedPnL: 200
       })
     })
 

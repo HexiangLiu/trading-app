@@ -14,24 +14,28 @@ export function usePnL(orders: Order[]) {
   useEffect(() => {
     const workerManager = getTradeWorkerManager()
     if (workerManager.initialized) {
-      workerManager.updateOrders(orders)
+      workerManager.sendMessage({
+        type: 'ORDERS_UPDATE',
+        data: { orders }
+      })
     }
   }, [orders])
 
-  // Remove closed orders from orderAtom
-  const removeClosedOrders = useCallback(
-    (closedOrders: Order[]) => {
+  // Remove orders for a closed position
+  const removeClosedPosition = useCallback(
+    (exchange: string, symbol: string) => {
       try {
-        // Filter out closed orders from current orders
+        // Filter out all orders for this exchange-symbol pair
         setOrders(currentOrders => {
-          const activeOrders = currentOrders.filter(
-            order => !closedOrders.some(closed => closed.id === order.id)
+          return currentOrders.filter(
+            order => !(order.exchange === exchange && order.symbol === symbol)
           )
-
-          return activeOrders
         })
       } catch (error) {
-        console.error('Failed to remove closed orders from orderAtom:', error)
+        console.error(
+          `Failed to remove orders for ${exchange}:${symbol}:`,
+          error
+        )
       }
     },
     [setOrders]
@@ -50,15 +54,14 @@ export function usePnL(orders: Order[]) {
     const handlePnLUpdate = (data: any) => {
       setPnLData({
         positions: [...data.positions],
-        totalUnrealizedPnL: data.totalUnrealizedPnL,
-        totalRealizedPnL: data.totalRealizedPnL
+        totalUnrealizedPnL: data.totalUnrealizedPnL
       })
     }
 
     // Listen for position closed events
     const handlePositionClosed = (data: any) => {
-      // Remove closed orders from orderAtom
-      removeClosedOrders(data.closedOrders)
+      // Remove all orders for this exchange-symbol pair
+      removeClosedPosition(data.exchange, data.symbol)
     }
 
     // Register message handlers
@@ -69,7 +72,7 @@ export function usePnL(orders: Order[]) {
       workerManager.offMessage('PNL_UPDATE')
       workerManager.offMessage('POSITION_CLOSED')
     }
-  }, [setPnLData, removeClosedOrders])
+  }, [setPnLData, removeClosedPosition])
 
   return { pnlData }
 }

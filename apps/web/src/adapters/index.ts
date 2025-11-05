@@ -6,11 +6,36 @@
 import { Exchange } from '@/types/instrument'
 import { binanceAdapter } from './Binance'
 
-export interface StreamSubscription {
+/**
+ * Stream type enum
+ */
+export enum StreamType {
+  KLINE = 'kline',
+  DEPTH = 'depth',
+  TRADE = 'trade'
+}
+
+/**
+ * Base stream configuration without callback
+ */
+interface StreamConfig {
   symbol: string
-  streamType: 'kline' | 'depth' | 'trade'
+  streamType: StreamType
   interval?: string // for kline streams
+}
+
+/**
+ * Stream subscription with callback
+ */
+export interface StreamSubscription extends StreamConfig {
   callback: (data: any) => void
+}
+
+/**
+ * Stream unsubscription - callback is optional
+ */
+export type StreamUnsubscription = StreamConfig & {
+  callback?: (data: any) => void
 }
 
 export interface ExchangeAdapter {
@@ -18,13 +43,7 @@ export interface ExchangeAdapter {
   connect(): Promise<void>
   // Dynamic subscription management
   subscribe(subscription: StreamSubscription): void
-  unsubscribe(
-    symbol: string,
-    streamType: 'kline' | 'depth' | 'trade',
-    interval?: string,
-    callback?: (data: any) => void
-  ): void
-  unsubscribeAll(symbol: string): void
+  unsubscribe(params: StreamUnsubscription): void
   // Historical data
   getHistoricalBars(
     symbol: string,
@@ -84,34 +103,11 @@ export class ExchangeAdapterManager {
   /**
    * Unsubscribe from a stream for specific exchange
    */
-  unsubscribe(
-    exchange: Exchange,
-    symbol: string,
-    streamType: 'kline' | 'depth' | 'trade',
-    interval?: string,
-    callback?: (data: any) => void
-  ): void {
+  unsubscribe(exchange: Exchange, params: StreamUnsubscription): void {
     const adapter = this.adapters.get(exchange)
     if (adapter) {
-      adapter.unsubscribe(symbol, streamType, interval, callback)
+      adapter.unsubscribe(params)
     }
-  }
-
-  /**
-   * Unsubscribe from all streams for a symbol
-   */
-  unsubscribeAll(exchange: Exchange, symbol: string): void {
-    const adapter = this.adapters.get(exchange)
-    if (adapter) {
-      adapter.unsubscribeAll(symbol)
-    }
-  }
-
-  /**
-   * Get all active adapters
-   */
-  getActiveAdapters(): Map<Exchange, ExchangeAdapter> {
-    return new Map(this.adapters)
   }
 }
 

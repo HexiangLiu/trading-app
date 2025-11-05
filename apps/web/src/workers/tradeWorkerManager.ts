@@ -1,4 +1,4 @@
-import type { Order, TradeData, WorkerMessage } from './tradeAggregator'
+import type { WorkerMessage } from './tradeAggregator'
 
 export class TradeWorkerManager {
   private worker: Worker | null = null
@@ -37,64 +37,30 @@ export class TradeWorkerManager {
     }
   }
 
-  subscribe(symbol: string) {
+  /**
+   * Send message to worker
+   */
+  sendMessage(message: WorkerMessage) {
     if (!this.worker || !this.isInitialized) {
-      console.warn('Worker not initialized, cannot subscribe to:', symbol)
+      console.warn('Worker not initialized, cannot send message:', message.type)
       return
     }
 
-    this.sendMessage({
-      type: 'SUBSCRIBE',
-      data: { symbol }
-    })
+    this.worker.postMessage(message)
   }
 
-  unsubscribe(symbol: string) {
-    if (!this.worker || !this.isInitialized) {
-      console.warn('Worker not initialized, cannot unsubscribe from:', symbol)
-      return
-    }
-
-    this.sendMessage({
-      type: 'UNSUBSCRIBE',
-      data: { symbol }
-    })
-  }
-
-  sendTradeData(tradeData: TradeData) {
-    if (!this.worker || !this.isInitialized) {
-      return
-    }
-
-    this.sendMessage({
-      type: 'TRADE_DATA',
-      data: tradeData
-    })
-  }
-
-  updateOrders(orders: Order[]) {
-    if (!this.worker || !this.isInitialized) {
-      return
-    }
-
-    this.sendMessage({
-      type: 'ORDERS_UPDATE',
-      data: { orders }
-    })
-  }
-
+  /**
+   * Register message handler
+   */
   onMessage(type: string, handler: (data: any) => void) {
     this.messageHandlers.set(type, handler)
   }
 
+  /**
+   * Unregister message handler
+   */
   offMessage(type: string) {
     this.messageHandlers.delete(type)
-  }
-
-  private sendMessage(message: WorkerMessage) {
-    if (this.worker) {
-      this.worker.postMessage(message)
-    }
   }
 
   destroy() {

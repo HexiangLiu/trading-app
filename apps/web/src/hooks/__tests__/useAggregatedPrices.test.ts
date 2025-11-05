@@ -5,8 +5,7 @@ import { useAggregatedPrices } from '../useAggregatedPrices'
 // Mock tradeWorkerManager
 const mockWorkerManagerData = {
   initialized: true,
-  subscribe: vi.fn(),
-  unsubscribe: vi.fn(),
+  sendMessage: vi.fn(),
   onMessage: vi.fn(),
   offMessage: vi.fn()
 }
@@ -107,7 +106,10 @@ describe('useAggregatedPrices', () => {
     })
 
     await waitFor(() => {
-      expect(workerManager.subscribe).toHaveBeenCalledWith('BTCUSDT')
+      expect(workerManager.sendMessage).toHaveBeenCalledWith({
+        type: 'SUBSCRIBE',
+        data: { symbol: 'BTCUSDT' }
+      })
     })
   })
 
@@ -124,7 +126,10 @@ describe('useAggregatedPrices', () => {
     })
 
     await waitFor(() => {
-      expect(workerManager.unsubscribe).toHaveBeenCalledWith('BTCUSDT')
+      expect(workerManager.sendMessage).toHaveBeenCalledWith({
+        type: 'UNSUBSCRIBE',
+        data: { symbol: 'BTCUSDT' }
+      })
     })
   })
 
@@ -138,7 +143,7 @@ describe('useAggregatedPrices', () => {
     })
 
     await waitFor(() => {
-      expect(mockWorkerManagerData.subscribe).not.toHaveBeenCalled()
+      expect(mockWorkerManagerData.sendMessage).not.toHaveBeenCalled()
     })
   })
 
@@ -152,7 +157,7 @@ describe('useAggregatedPrices', () => {
     })
 
     await waitFor(() => {
-      expect(mockWorkerManagerData.unsubscribe).not.toHaveBeenCalled()
+      expect(mockWorkerManagerData.sendMessage).not.toHaveBeenCalled()
     })
   })
 
