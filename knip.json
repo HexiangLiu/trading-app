@@ -1,0 +1,19 @@
+{
+    "$schema": "https://unpkg.com/knip@5/schema.json",
+    "include": [
+        "exports",
+        "enumMembers",
+        "types",
+        "files"
+    ],
+    "workspaces": {
+        "apps/web": {
+            "project": [
+                "src/**/*.ts",
+                "src/**/*.tsx",
+                "!src/public/**",
+                "!src/charting_library/**"
+            ]
+        }
+    }
+}

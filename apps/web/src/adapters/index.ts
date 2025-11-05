@@ -18,7 +18,7 @@ export enum StreamType {
 /**
  * Base stream configuration without callback
  */
-export interface StreamConfig {
+interface StreamConfig {
   symbol: string
   streamType: StreamType
   interval?: string // for kline streams

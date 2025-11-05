@@ -20,16 +20,6 @@ import type {
 } from '@/charting_library'
 import type { Exchange } from '@/types/instrument'
 
-export interface Bar {
-  time: number
-  open: number
-  high: number
-  low: number
-  close: number
-  volume: number
-  symbol?: string // 可选的symbol标识
-}
-
 export class Datafeed implements IBasicDataFeed {
   /**
    * TradingView Datafeed接口实现
@@ -200,5 +190,3 @@ export class Datafeed implements IBasicDataFeed {
 
   unsubscribeBars(_subscribeUID: string): void {}
 }
-
-export const datafeed = new Datafeed()

@@ -11,7 +11,7 @@ import type {
 } from '..'
 import { StreamType } from '..'
 
-export interface KlineData {
+interface KlineData {
   openTime: number
   closeTime: number
   open: number
@@ -26,7 +26,7 @@ export interface KlineData {
   isClosed: boolean
 }
 
-export interface BinanceKlineStream {
+interface BinanceKlineStream {
   e: string // Event type
   E: number // Event time
   s: string // Symbol
