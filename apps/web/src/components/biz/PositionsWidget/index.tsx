@@ -1,6 +1,6 @@
 import { useAtom } from 'jotai'
 import { memo, useEffect, useMemo, useState } from 'react'
-import { exchangeAdapterManager } from '@/adapters'
+import { exchangeAdapterManager, StreamType } from '@/adapters'
 import { useAggregatedPrices } from '@/hooks/useAggregatedPrices'
 import { usePnL } from '@/hooks/usePnL'
 import { orderAtom } from '@/store/order'
@@ -48,7 +48,7 @@ export const PositionsWidget = memo(() => {
       // Subscribe to trade stream for this exchange-symbol combination
       exchangeAdapterManager.subscribe(exchange as any, {
         symbol,
-        streamType: 'trade',
+        streamType: StreamType.TRADE,
         callback: () => {} // Empty callback, data goes to Worker
       })
 
@@ -60,12 +60,10 @@ export const PositionsWidget = memo(() => {
       console.log('Cleaning up subscriptions')
       // Cleanup subscriptions
       orderInstruments.forEach(({ exchange, symbol }) => {
-        exchangeAdapterManager.unsubscribe(
-          exchange as any,
+        exchangeAdapterManager.unsubscribe(exchange as any, {
           symbol,
-          'trade',
-          undefined
-        )
+          streamType: StreamType.TRADE
+        })
         unsubscribe(symbol)
       })
     }

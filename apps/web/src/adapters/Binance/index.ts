@@ -4,7 +4,12 @@
 
 import type { OrderBookData } from '@/types/orderbook'
 import { getTradeWorkerManager } from '@/workers/tradeWorkerManager'
-import type { ExchangeAdapter, StreamSubscription } from '..'
+import type {
+  ExchangeAdapter,
+  StreamSubscription,
+  StreamUnsubscription
+} from '..'
+import { StreamType } from '..'
 
 export interface KlineData {
   openTime: number
@@ -47,6 +52,8 @@ export interface BinanceKlineStream {
 }
 
 export class BinanceAdapter implements ExchangeAdapter {
+  // ==================== Static Properties ====================
+
   // Static interval mapping from TradingView to Binance format
   private static readonly INTERVAL_MAP = {
     '1': '1m',
@@ -57,6 +64,8 @@ export class BinanceAdapter implements ExchangeAdapter {
     '240': '4h',
     '1D': '1d'
   } as const
+
+  // ==================== Instance Properties ====================
 
   private ws: WebSocket | null = null
   private isConnected = false
@@ -72,6 +81,8 @@ export class BinanceAdapter implements ExchangeAdapter {
   private baseApiUrl: string
   private baseStreamUrl: string
 
+  // ==================== Constructor ====================
+
   constructor(
     baseApiUrl: string = 'https://data-api.binance.vision',
     baseStreamUrl: string = 'wss://data-stream.binance.vision'
@@ -79,7 +90,12 @@ export class BinanceAdapter implements ExchangeAdapter {
     this.baseApiUrl = baseApiUrl
     this.baseStreamUrl = baseStreamUrl
   }
-  // New interface methods
+
+  // ==================== Public Interface Methods ====================
+
+  /**
+   * Subscribe to a stream
+   */
   subscribe(subscription: StreamSubscription): void {
     const streamName = this.getStreamName(
       subscription.symbol,
@@ -100,7 +116,7 @@ export class BinanceAdapter implements ExchangeAdapter {
       sub => sub.callback === subscription.callback
     )
     if (existingSubscription) {
-      console.log(`Callback already subscribed to stream: ${streamName}`)
+      this.log('info', `Callback already subscribed to stream: ${streamName}`)
       return
     }
 
@@ -118,29 +134,34 @@ export class BinanceAdapter implements ExchangeAdapter {
       if (!this.connectingPromise) {
         this.connectingPromise = this.connect()
           .then(() => {
-            console.log(`Connection established for stream: ${streamName}`)
+            this.log('info', `Connection established for stream: ${streamName}`)
             this.connectingPromise = null
           })
           .catch(error => {
-            console.error('Failed to connect for subscription:', error)
+            this.log('error', 'Failed to connect for subscription:', error)
             this.connectingPromise = null
           })
       }
     } else if (isNewStream) {
       // If already connected and this is a new stream, send SUBSCRIBE message
-      console.log(`Sending SUBSCRIBE message for new stream: ${streamName}`)
+      this.log(
+        'info',
+        `Sending SUBSCRIBE message for new stream: ${streamName}`
+      )
       this.subscribeToStream(streamName)
     } else {
-      console.log(`Stream ${streamName} already active, added new callback`)
+      this.log(
+        'info',
+        `Stream ${streamName} already active, added new callback`
+      )
     }
   }
 
-  unsubscribe(
-    symbol: string,
-    streamType: 'kline' | 'depth' | 'trade',
-    interval?: string,
-    callback?: (data: any) => void
-  ): void {
+  /**
+   * Unsubscribe from a stream
+   */
+  unsubscribe(params: StreamUnsubscription): void {
+    const { symbol, streamType, interval, callback } = params
     const streamName = this.getStreamName(symbol, streamType, interval)
     const subscriptionKey = this.getSubscriptionKey(
       symbol,
@@ -180,32 +201,9 @@ export class BinanceAdapter implements ExchangeAdapter {
     }
   }
 
-  unsubscribeAll(symbol: string): void {
-    // Find all subscriptions for this symbol
-    const subscriptionsToRemove: string[] = []
-
-    for (const [key, subscriptions] of this.subscriptions) {
-      // Check if any subscription in this stream matches the symbol
-      if (subscriptions.some(sub => sub.symbol === symbol)) {
-        subscriptionsToRemove.push(key)
-      }
-    }
-
-    // Unsubscribe from all found subscriptions
-    for (const key of subscriptionsToRemove) {
-      const subscriptions = this.subscriptions.get(key)
-      if (subscriptions && subscriptions.length > 0) {
-        // Get the first subscription to extract stream info
-        const firstSub = subscriptions[0]
-        this.unsubscribe(
-          firstSub.symbol,
-          firstSub.streamType,
-          firstSub.interval
-        )
-      }
-    }
-  }
-
+  /**
+   * Get exchange name
+   */
   getExchange(): string {
     return 'BINANCE'
   }
@@ -217,7 +215,7 @@ export class BinanceAdapter implements ExchangeAdapter {
     return new Promise((resolve, reject) => {
       try {
         if (this.ws && this.isConnected) {
-          console.log('already connected')
+          this.log('info', 'Already connected')
           resolve()
           return
         }
@@ -225,11 +223,11 @@ export class BinanceAdapter implements ExchangeAdapter {
         // Connect to base WebSocket endpoint without any streams
         const url = `${this.baseStreamUrl}/ws`
 
-        console.log('Connecting to:', url)
+        this.log('info', 'Connecting to:', url)
         this.ws = new WebSocket(url)
 
         this.ws.onopen = () => {
-          console.log('Binance WebSocket connected')
+          this.log('info', 'WebSocket connected')
           this.isConnected = true
           this.reconnectAttempts = 0
 
@@ -244,19 +242,20 @@ export class BinanceAdapter implements ExchangeAdapter {
             const data = JSON.parse(event.data)
             this.handleMessage(data)
           } catch (error) {
-            console.error('Error parsing WebSocket message:', error)
+            this.log('error', 'Error parsing WebSocket message:', error)
           }
         }
 
         this.ws.onclose = event => {
-          console.log('Binance WebSocket closed:', event.code, event.reason)
+          this.log('info', 'WebSocket closed:', event.code, event.reason)
           this.isConnected = false
 
           // Trigger reconnection for unexpected closures (not normal closure or going away)
           // 1000: Normal closure
           // 1001: Going away (page refresh, navigation)
           if (event.code !== 1000 && event.code !== 1001) {
-            console.log(
+            this.log(
+              'info',
               'Unexpected closure detected, triggering reconnection...'
             )
             this.handleReconnect()
@@ -264,7 +263,7 @@ export class BinanceAdapter implements ExchangeAdapter {
         }
 
         this.ws.onerror = error => {
-          console.error('Binance WebSocket error:', error)
+          this.log('error', 'WebSocket error:', error)
         }
       } catch (error) {
         reject(error)
@@ -273,64 +272,127 @@ export class BinanceAdapter implements ExchangeAdapter {
   }
 
   /**
-   * Subscribe to all active streams via SUBSCRIBE messages
+   * Get historical K-line data
+   * Using Binance REST API uiKlines endpoint
    */
-  private subscribeToAllActiveStreams(): void {
-    const allStreams = Array.from(this.activeStreams)
-    if (allStreams.length === 0) {
-      console.log('No active streams to subscribe to')
-      return
-    }
+  async getHistoricalBars(
+    symbol: string,
+    interval: string,
+    startTime: number,
+    endTime: number,
+    limit: number = 1000
+  ): Promise<any[]> {
+    try {
+      // Map TradingView interval to Binance interval
+      const binanceInterval =
+        BinanceAdapter.INTERVAL_MAP[
+          interval as keyof typeof BinanceAdapter.INTERVAL_MAP
+        ] || '4h'
 
-    console.log('Subscribing to all active streams:', allStreams)
+      // Build API URL
+      const endpoint = '/api/v3/uiKlines'
+      const params = new URLSearchParams({
+        symbol: symbol.toUpperCase(),
+        interval: binanceInterval,
+        startTime: startTime.toString(),
+        endTime: endTime.toString(),
+        limit: Math.min(limit, 1000).toString() // Binance supports up to 1000 bars
+      })
 
-    // Send SUBSCRIBE message for all active streams
-    const subscribeMessage = {
-      method: 'SUBSCRIBE',
-      params: allStreams,
-      id: Date.now()
-    }
+      const url = `${this.baseApiUrl}${endpoint}?${params}`
+      this.log('info', 'Fetching historical data from:', url)
 
-    if (this.ws && this.isConnected) {
-      this.ws.send(JSON.stringify(subscribeMessage))
-      console.log('Sent SUBSCRIBE message for streams:', allStreams)
+      const response = await fetch(url)
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`)
+      }
+
+      const data = await response.json()
+
+      // Convert Binance data format to TradingView format
+      return data.map((kline: any[]) => ({
+        time: kline[0], // Kline open time
+        open: parseFloat(kline[1]), // Open price
+        high: parseFloat(kline[2]), // High price
+        low: parseFloat(kline[3]), // Low price
+        close: parseFloat(kline[4]), // Close price
+        volume: parseFloat(kline[5]), // Volume
+        symbol: symbol
+      }))
+    } catch (error) {
+      this.log('error', 'Failed to fetch historical data:', error)
+      throw error
     }
+  }
+
+  // ==================== Private Utility Methods ====================
+
+  /**
+   * Unified logging method
+   */
+  private log(
+    level: 'info' | 'warn' | 'error',
+    message: string,
+    ...args: any[]
+  ): void {
+    const prefix = '[BinanceAdapter]'
+    console[level](`${prefix} ${message}`, ...args)
   }
 
   /**
-   * Subscribe to a single stream via SUBSCRIBE message
+   * Send WebSocket stream message (SUBSCRIBE/UNSUBSCRIBE)
    */
-  private subscribeToStream(streamName: string): void {
+  private sendStreamMessage(
+    method: 'SUBSCRIBE' | 'UNSUBSCRIBE',
+    streams: string | string[]
+  ): void {
     if (!this.ws || !this.isConnected) {
-      console.warn(
-        'WebSocket not connected, cannot subscribe to stream:',
-        streamName
-      )
+      this.log('warn', `WebSocket not connected, cannot ${method}`)
       return
     }
 
-    const subscribeMessage = {
-      method: 'SUBSCRIBE',
-      params: [streamName],
+    const params = Array.isArray(streams) ? streams : [streams]
+    const message = {
+      method,
+      params,
       id: Date.now()
     }
 
-    this.ws.send(JSON.stringify(subscribeMessage))
-    console.log('Sent SUBSCRIBE message for stream:', streamName)
+    this.ws.send(JSON.stringify(message))
+    this.log('info', `Sent ${method} message for streams:`, params)
   }
+
+  /**
+   * Notify all subscriptions with data
+   */
+  private notifySubscriptions<T>(
+    subscriptions: StreamSubscription[],
+    data: T,
+    streamType: string
+  ): void {
+    subscriptions.forEach(subscription => {
+      try {
+        subscription.callback(data)
+      } catch (error) {
+        this.log('error', `Error calling ${streamType} callback:`, error)
+      }
+    })
+  }
+
+  // ==================== Private Subscription Management ====================
 
   /**
    * Get stream name for subscription
    */
   private getStreamName(
     symbol: string,
-    streamType: 'kline' | 'depth' | 'trade',
+    streamType: StreamType,
     interval?: string
   ): string {
     const symbolLower = symbol.toLowerCase()
 
     switch (streamType) {
-      case 'kline': {
+      case StreamType.KLINE: {
         // Map TradingView interval to Binance interval
         const binanceInterval = interval
           ? BinanceAdapter.INTERVAL_MAP[
@@ -339,9 +401,9 @@ export class BinanceAdapter implements ExchangeAdapter {
           : '1m'
         return `${symbolLower}@kline_${binanceInterval}`
       }
-      case 'depth':
+      case StreamType.DEPTH:
         return `${symbolLower}@depth20@100ms`
-      case 'trade':
+      case StreamType.TRADE:
         return `${symbolLower}@aggTrade`
       default:
         throw new Error(`Unsupported stream type: ${streamType}`)
@@ -353,7 +415,7 @@ export class BinanceAdapter implements ExchangeAdapter {
    */
   private getSubscriptionKey(
     symbol: string,
-    streamType: 'kline' | 'depth' | 'trade',
+    streamType: StreamType,
     interval?: string
   ): string {
     // For kline streams, use the original interval for key consistency
@@ -362,26 +424,94 @@ export class BinanceAdapter implements ExchangeAdapter {
   }
 
   /**
+   * Subscribe to all active streams via SUBSCRIBE messages
+   */
+  private subscribeToAllActiveStreams(): void {
+    const allStreams = Array.from(this.activeStreams)
+    if (allStreams.length === 0) {
+      this.log('info', 'No active streams to subscribe to')
+      return
+    }
+
+    this.log('info', 'Subscribing to all active streams:', allStreams)
+    this.sendStreamMessage('SUBSCRIBE', allStreams)
+  }
+
+  /**
+   * Subscribe to a single stream via SUBSCRIBE message
+   */
+  private subscribeToStream(streamName: string): void {
+    this.sendStreamMessage('SUBSCRIBE', streamName)
+  }
+
+  /**
    * Unsubscribe from a specific stream
    */
   private unsubscribeFromStream(streamName: string): void {
     if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
-      console.warn(
+      this.log(
+        'warn',
         'WebSocket not connected, cannot unsubscribe from stream:',
         streamName
       )
       return
     }
 
-    const unsubscribeMessage = {
-      method: 'UNSUBSCRIBE',
-      params: [streamName],
-      id: Date.now()
+    this.sendStreamMessage('UNSUBSCRIBE', streamName)
+  }
+
+  /**
+   * Get all subscriptions by stream type
+   */
+  private getSubscriptionsByType(streamType: StreamType): StreamSubscription[] {
+    const result: StreamSubscription[] = []
+    for (const subscriptions of this.subscriptions.values()) {
+      for (const subscription of subscriptions) {
+        if (subscription.streamType === streamType) {
+          result.push(subscription)
+        }
+      }
+    }
+    return result
+  }
+
+  // ==================== Private WebSocket Management ====================
+
+  /**
+   * Handle reconnection logic
+   */
+  private handleReconnect(): void {
+    if (this.reconnectAttempts >= this.maxReconnectAttempts) {
+      this.log('error', 'Max reconnection attempts reached')
+      return
     }
 
-    this.ws.send(JSON.stringify(unsubscribeMessage))
-    console.log('Unsubscribed from stream:', streamName)
+    this.reconnectAttempts++
+    const delay = this.reconnectDelay * 2 ** (this.reconnectAttempts - 1)
+
+    this.log(
+      'info',
+      `Reconnecting in ${delay}ms (attempt ${this.reconnectAttempts})`
+    )
+
+    setTimeout(() => {
+      // Reconnect with current active streams
+      this.connect()
+        .then(() => {
+          this.log(
+            'info',
+            'Reconnected successfully with streams:',
+            Array.from(this.activeStreams)
+          )
+        })
+        .catch(error => {
+          this.log('error', 'Reconnection failed:', error)
+          this.handleReconnect()
+        })
+    }, delay)
   }
+
+  // ==================== Private Message Handling ====================
 
   /**
    * Handle WebSocket messages
@@ -389,7 +519,7 @@ export class BinanceAdapter implements ExchangeAdapter {
   private handleMessage(data: any): void {
     // Handle SUBSCRIBE/UNSUBSCRIBE confirmation messages
     if (data.result !== undefined && data.id !== undefined) {
-      console.log('Received subscription confirmation:', data)
+      this.log('info', 'Received subscription confirmation:', data)
       return
     }
 
@@ -399,10 +529,10 @@ export class BinanceAdapter implements ExchangeAdapter {
       // This is a depth stream data
       // We need to find which depth stream this belongs to
       // Since we can't determine the exact stream from raw data, we'll distribute to all depth subscriptions
-      const depthSubscriptions = this.getSubscriptionsByType('depth')
+      const depthSubscriptions = this.getSubscriptionsByType(StreamType.DEPTH)
 
       if (depthSubscriptions.length === 0) {
-        console.warn('No depth subscriptions found for raw data')
+        this.log('warn', 'No depth subscriptions found for raw data')
         return
       }
 
@@ -413,10 +543,10 @@ export class BinanceAdapter implements ExchangeAdapter {
     // Handle kline data format
     if (data.e === 'kline') {
       // This is kline data
-      const klineSubscriptions = this.getSubscriptionsByType('kline')
+      const klineSubscriptions = this.getSubscriptionsByType(StreamType.KLINE)
 
       if (klineSubscriptions.length === 0) {
-        console.warn('No kline subscriptions found for raw data')
+        this.log('warn', 'No kline subscriptions found for raw data')
         return
       }
 
@@ -427,33 +557,16 @@ export class BinanceAdapter implements ExchangeAdapter {
     // Handle trade data format (both trade and aggTrade)
     if (data.e === 'trade' || data.e === 'aggTrade') {
       // This is trade data
-      const tradeSubscriptions = this.getSubscriptionsByType('trade')
+      const tradeSubscriptions = this.getSubscriptionsByType(StreamType.TRADE)
 
       if (tradeSubscriptions.length === 0) {
-        console.warn('No trade subscriptions found for raw data')
+        this.log('warn', 'No trade subscriptions found for raw data')
         return
       }
 
       this.handleTradeStream(data, tradeSubscriptions)
       return
     }
-  }
-
-  /**
-   * Get all subscriptions by stream type
-   */
-  private getSubscriptionsByType(
-    streamType: 'kline' | 'depth' | 'trade'
-  ): StreamSubscription[] {
-    const result: StreamSubscription[] = []
-    for (const subscriptions of this.subscriptions.values()) {
-      for (const subscription of subscriptions) {
-        if (subscription.streamType === streamType) {
-          result.push(subscription)
-        }
-      }
-    }
-    return result
   }
 
   /**
@@ -481,10 +594,8 @@ export class BinanceAdapter implements ExchangeAdapter {
         symbol: subscriptions[0].symbol // Use first subscription's symbol
       }
 
-      // Call all subscription callbacks
-      subscriptions.forEach(subscription => {
-        subscription.callback(bar)
-      })
+      // Notify all subscriptions
+      this.notifySubscriptions(subscriptions, bar, 'kline')
     }
   }
 
@@ -513,17 +624,8 @@ export class BinanceAdapter implements ExchangeAdapter {
         timestamp: Date.now()
       }
 
-      // Call all subscription callbacks
-      subscriptions.forEach(subscription => {
-        try {
-          subscription.callback(orderBook)
-        } catch (error) {
-          console.error(
-            'BinanceAdapter: Error calling order book callback:',
-            error
-          )
-        }
-      })
+      // Notify all subscriptions
+      this.notifySubscriptions(subscriptions, orderBook, 'depth')
     }
   }
 
@@ -556,22 +658,18 @@ export class BinanceAdapter implements ExchangeAdapter {
         if (workerManager.initialized) {
           workerManager.sendTradeData(trade)
         } else {
-          console.warn('Worker not initialized, cannot send trade data')
+          this.log('warn', 'Worker not initialized, cannot send trade data')
         }
       } catch (error) {
-        console.error('Failed to send trade data to worker:', error)
+        this.log('error', 'Failed to send trade data to worker:', error)
       }
 
-      // Call all subscription callbacks (for backward compatibility)
-      subscriptions.forEach(subscription => {
-        try {
-          subscription.callback(trade)
-        } catch (error) {
-          console.error('BinanceAdapter: Error calling trade callback:', error)
-        }
-      })
+      // Notify all subscriptions (for backward compatibility)
+      this.notifySubscriptions(subscriptions, trade, 'trade')
     }
   }
+
+  // ==================== Private Data Parsing ====================
 
   /**
    * Parse K-line data stream
@@ -592,92 +690,6 @@ export class BinanceAdapter implements ExchangeAdapter {
       buyBaseVolume: parseFloat(k.V),
       buyQuoteVolume: parseFloat(k.Q),
       isClosed: k.x
-    }
-  }
-
-  /**
-   * Handle reconnection logic
-   */
-  private handleReconnect(): void {
-    if (this.reconnectAttempts >= this.maxReconnectAttempts) {
-      console.error('Max reconnection attempts reached')
-      return
-    }
-
-    this.reconnectAttempts++
-    const delay = this.reconnectDelay * 2 ** (this.reconnectAttempts - 1)
-
-    console.log(
-      `Reconnecting in ${delay}ms (attempt ${this.reconnectAttempts})`
-    )
-
-    setTimeout(() => {
-      // Reconnect with current active streams
-      this.connect()
-        .then(() => {
-          console.log(
-            'Reconnected successfully with streams:',
-            Array.from(this.activeStreams)
-          )
-        })
-        .catch(error => {
-          console.error('Reconnection failed:', error)
-          this.handleReconnect()
-        })
-    }, delay)
-  }
-
-  /**
-   * Get historical K-line data
-   * Using Binance REST API uiKlines endpoint
-   */
-  async getHistoricalBars(
-    symbol: string,
-    interval: string,
-    startTime: number,
-    endTime: number,
-    limit: number = 1000
-  ): Promise<any[]> {
-    try {
-      // Map TradingView interval to Binance interval
-      const binanceInterval =
-        BinanceAdapter.INTERVAL_MAP[
-          interval as keyof typeof BinanceAdapter.INTERVAL_MAP
-        ] || '4h'
-
-      // Build API URL
-      const endpoint = '/api/v3/uiKlines'
-      const params = new URLSearchParams({
-        symbol: symbol.toUpperCase(),
-        interval: binanceInterval,
-        startTime: startTime.toString(),
-        endTime: endTime.toString(),
-        limit: Math.min(limit, 1000).toString() // Binance supports up to 1000 bars
-      })
-
-      const url = `${this.baseApiUrl}${endpoint}?${params}`
-      console.log('Fetching historical data from:', url)
-
-      const response = await fetch(url)
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`)
-      }
-
-      const data = await response.json()
-
-      // Convert Binance data format to TradingView format
-      return data.map((kline: any[]) => ({
-        time: kline[0], // Kline open time
-        open: parseFloat(kline[1]), // Open price
-        high: parseFloat(kline[2]), // High price
-        low: parseFloat(kline[3]), // Low price
-        close: parseFloat(kline[4]), // Close price
-        volume: parseFloat(kline[5]), // Volume
-        symbol: symbol
-      }))
-    } catch (error) {
-      console.error('Failed to fetch historical data:', error)
-      throw error
     }
   }
 }

@@ -8,7 +8,7 @@ import {
   useRef,
   useState
 } from 'react'
-import { exchangeAdapterManager } from '@/adapters'
+import { exchangeAdapterManager, StreamType } from '@/adapters'
 import {
   type CustomIndicator,
   type IChartingLibraryWidget,
@@ -47,12 +47,11 @@ export const TradingViewChart = memo(() => {
     // Unsubscribe from old instrument kline streams only
     if (oldInstrument) {
       // Only unsubscribe kline streams, other components might still need depth/trade streams
-      exchangeAdapterManager.unsubscribe(
-        oldInstrument.exchange,
-        oldInstrument.name,
-        'kline',
-        currentIntervalRef.current
-      )
+      exchangeAdapterManager.unsubscribe(oldInstrument.exchange, {
+        symbol: oldInstrument.name,
+        streamType: StreamType.KLINE,
+        interval: currentIntervalRef.current
+      })
     }
     console.log('Switch instrument:', instrument)
     widgetRef.current
@@ -104,9 +103,11 @@ export const TradingViewChart = memo(() => {
           console.log('onIntervalChanged', interval, currentIntervalRef.current)
           exchangeAdapterManager.unsubscribe(
             currentInstrumentRef.current.exchange,
-            currentInstrumentRef.current.name,
-            'kline',
-            currentIntervalRef.current
+            {
+              symbol: currentInstrumentRef.current.name,
+              streamType: StreamType.KLINE,
+              interval: currentIntervalRef.current
+            }
           )
           currentIntervalRef.current = interval
         })
@@ -120,9 +121,11 @@ export const TradingViewChart = memo(() => {
         if (currentInstrumentRef.current) {
           exchangeAdapterManager.unsubscribe(
             currentInstrumentRef.current.exchange,
-            currentInstrumentRef.current.name,
-            'kline',
-            currentIntervalRef.current
+            {
+              symbol: currentInstrumentRef.current.name,
+              streamType: StreamType.KLINE,
+              interval: currentIntervalRef.current
+            }
           )
         }
         tvWidget.remove()
